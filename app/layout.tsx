@@ -18,7 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <nav className="p-4">
-          <div id='nav' className="flex gap-4">
+          <div id='nav' className="flex gap-4 hidden">
             <a href="/">Home</a>
             <a href="/dashboard">Dashboard</a>
             <a href="/screen-a">Screen A</a>

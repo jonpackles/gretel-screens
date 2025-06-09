@@ -14,9 +14,10 @@ export default function ScreenA() {
         const res = await fetch('/api/media?path=linked-content/posters&recursive=true');
         const data = await res.json();
 
-        const files = data.items?.filter((item: MediaItem) =>
+        const files = (data.items?.filter((item: MediaItem) =>
           item.type === 'file' && /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name)
-        ) || [];
+        ) || [])
+          .sort(() => Math.random() - 0.5);
 
         setMedia(files);
       } catch (err) {
