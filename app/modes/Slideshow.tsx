@@ -59,7 +59,7 @@ export default function Slideshow({ media }: SlideshowProps) {
     };
 
     pickRandom();
-    const interval = setInterval(pickRandom, 30000); // every 30s
+    const interval = setInterval(pickRandom, 10000); // every 30s
     return () => clearInterval(interval);
   }, [media]);
 
@@ -72,23 +72,25 @@ export default function Slideshow({ media }: SlideshowProps) {
 
   const isSingleItem = currentItems.length === 1;
 
-  const renderMediaItem = (item: MediaItem, anchor: 'top' | 'bottom') => {
-    const anchorClass = anchor === 'top' ? 'items-start' : 'items-end';
+  const renderMediaItem = (item: MediaItem, anchor: 'top' | 'bottom', horizontalAnchor: 'left' | 'right' | 'center' = 'center') => {
+    const verticalClass = anchor === 'top' ? 'items-start' : 'items-end';
+    const horizontalClass = horizontalAnchor === 'left' ? 'justify-start' : 
+                           horizontalAnchor === 'right' ? 'justify-end' : 'justify-center';
     
     return item.name.match(/\.(mp4)$/i) ? (
-      <div className={`flex ${anchorClass} justify-start w-full h-full`}>
+      <div className={`flex ${verticalClass} ${horizontalClass} w-full h-full`}>
         <video
           key={item.path}
           src={`/content/${item.path}`}
           className="max-w-full max-h-full object-contain"
-          autoPlay  
+          autoPlay
           muted
           loop
           playsInline
         />
       </div>
     ) : (
-      <div className={`flex ${anchorClass} justify-end w-full h-full`}>
+      <div className={`flex ${verticalClass} ${horizontalClass} w-full h-full`}>
         <div className="relative max-w-full max-h-full">
           <Image
             onLoadingComplete={() => {
@@ -116,18 +118,18 @@ export default function Slideshow({ media }: SlideshowProps) {
       {isSingleItem ? (
         // Single item takes full width and height
         <div className="w-full h-full overflow-hidden flex items-center justify-center">
-          {renderMediaItem(currentItems[0], 'top')}
+          {renderMediaItem(currentItems[0], 'top', 'center')}
         </div>
       ) : (
         <>
           {/* Left Container - 50% width, full height */}
           <div className="w-1/2 h-full overflow-hidden">
-            {currentItems[0] && renderMediaItem(currentItems[0], 'top')}
+            {currentItems[0] && renderMediaItem(currentItems[0], 'top', 'center')}
           </div>
           
           {/* Right Container - 50% width, full height */}
           <div className="w-1/2 h-full overflow-hidden justify-end">
-            {currentItems[1] && renderMediaItem(currentItems[1], 'bottom')}
+            {currentItems[1] && renderMediaItem(currentItems[1], 'bottom', 'right')}
           </div>
         </>
       )}
