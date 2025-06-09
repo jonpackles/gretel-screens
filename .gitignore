@@ -30,4 +30,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts public/content/linked-content
+next-env.d.ts
+
+# content
+public/content/linked-content/
