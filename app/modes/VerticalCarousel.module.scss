@@ -1,0 +1,30 @@
+.carouselWrapper {
+    overflow: hidden;
+    height: 100vh;
+    position: relative;
+  }
+  
+  .innerTrack {
+    transition: transform 1s ease-in-out;
+  }
+  
+  .poster {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    transition: transform 1s ease, opacity 1s ease;
+    opacity: 1;
+    transform: scale(0.8);
+  
+    & img {
+      max-height: 95vh;
+      max-width: 90vw;
+      object-fit: contain;
+    }
+  
+    &.active {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
