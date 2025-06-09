@@ -1,8 +1,16 @@
 # Your App
 
-A Next.js application with custom routing structure.
+A Next.js application that displays media content in different viewing modes. Built with TypeScript and React, utilizing Next.js 13's app router for clean URL paths.
 
-## Getting Started
+# Linking Content
+
+Before starting the development server, create a symlink to your assets folder:
+
+```bash
+ln -s path/to/Gretel_Internal/10_Assets ./public/content/linked-content
+
+
+## Getting started with the app
 
 First, install the dependencies:
 
@@ -15,6 +23,7 @@ pnpm install
 ```
 
 Then, run the development server:
+
 
 ```bash
 npm run dev
