@@ -6,7 +6,19 @@
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+  --background: #000;
+  --foreground: #fff;
+  --h1-size: clamp(64px, 12vw, 96px);
+  --h2-size: clamp(40px, 6vw, 48px);
+  --h3-size: clamp(32px, 4.5vw, 36px);
+  --h4-size: clamp(28px, 4vw, 33px);
+  --event-date-size: clamp(2rem, 8vw, 8rem);
+  --event-title-size: clamp(1.5rem, 4vw, 4rem);
+  --event-title-fullscreen-size: clamp(3rem, 12vw, 12rem);
+  --event-info-size: clamp(1rem, 3vw, 3rem);
 }
+
+
 
 @media (prefers-color-scheme: dark) {
   :root {

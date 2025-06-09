@@ -2,12 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import Image from 'next/image';
-
-type MediaItem = {
-  name: string;
-  type: 'file';
-  path: string;
-};
+import { MediaItem } from '../types/media';
 
 type Props = {
   media: MediaItem[];

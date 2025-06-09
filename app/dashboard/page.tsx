@@ -8,6 +8,7 @@ type FileItem = {
   name: string;
   type: 'file' | 'directory';
   path: string;
+  project?: string;
 };
 
 export default function Dashboard() {
