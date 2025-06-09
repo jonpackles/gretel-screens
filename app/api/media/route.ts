@@ -21,6 +21,7 @@ function getDirectoryContents(dirPath: string, relativeBase = '', recursive = fa
         name: entry.name,
         type: 'directory',
         path: relativePath.replace(/\\/g, '/'),
+        project: relativePath.split('/')[0],
         lastModified: stat.mtime.toISOString(),
       };
 
@@ -35,6 +36,7 @@ function getDirectoryContents(dirPath: string, relativeBase = '', recursive = fa
         name: entry.name,
         type: 'file',
         path: relativePath.replace(/\\/g, '/'),
+        project: relativePath.split('/')[0],
         lastModified: stat.mtime.toISOString(),
       }];
     }

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import VerticalCarousel from '../modes/VerticalCarousel';
-import { MediaItem } from '../types/media';
+import VerticalCarousel from '../../modes/VerticalCarousel';
+import { MediaItem } from '../../types/media';
 
 export default function ScreenA() {
   const [media, setMedia] = useState<MediaItem[]>([]);

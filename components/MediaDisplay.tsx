@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { MediaItem } from '../types/media';
+import { MediaItem } from '../app/types/media';
 
 interface MediaDisplayProps {
   item: MediaItem;

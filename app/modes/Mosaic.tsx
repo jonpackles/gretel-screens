@@ -17,12 +17,26 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
   const [tileSize, setTileSize] = useState(75);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [rowOffset, setRowOffset] = useState(0);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [autoSwitch, setAutoSwitch] = useState(true);
+  const [blackAndWhite, setBlackAndWhite] = useState(false);
   const showSkeletonRef = useRef(showSkeleton);
 
   // Update ref when state changes
   useEffect(() => {
     showSkeletonRef.current = showSkeleton;
   }, [showSkeleton]);
+
+  // Auto-switch between media items every 10 seconds
+  useEffect(() => {
+    if (!autoSwitch || media.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentMediaIndex((prev) => (prev + 1) % media.length);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [autoSwitch, media.length]);
 
   if (!media.length) return <div>Waiting for media...</div>;
 
@@ -60,6 +74,17 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
           containerRef.current.appendChild(app.canvas);
           appRef.current = app;
 
+          // Create black and white filter
+          const colorMatrixFilter = new PIXI.ColorMatrixFilter();
+          colorMatrixFilter.desaturate();
+          
+          // Apply or remove filter based on state
+          if (blackAndWhite) {
+            app.stage.filters = [colorMatrixFilter];
+          } else {
+            app.stage.filters = [];
+          }
+
           // Create textures from all media items
           const textures: PIXI.Texture[] = [];
           
@@ -96,7 +121,8 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
           const tileMetadata = new Map<PIXI.Sprite, { tileX: number, tileY: number, tileSize: number }>();
           const tileDelays = new Map<PIXI.Sprite, number>(); // Track delay frames for each tile
           
-          let tileIndex = 0; // For cycling through textures
+          // Use only the currently selected texture for all tiles
+          const currentTexture = textures[currentMediaIndex % textures.length];
           let rowIndex = 0; // Track which row we're on for offset
           
           for (let y = 0; y < app.screen.height; y += tileSize) {
@@ -108,20 +134,19 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
               // Skip tiles that are completely off-screen
               if (actualX + tileSize < 0 || actualX > app.screen.width) continue;
               
-              // Cycle through available textures
-              const texture = textures[tileIndex % textures.length];
-              const sprite = new PIXI.Sprite(texture);
+              // Use the same texture for all tiles
+              const sprite = new PIXI.Sprite(currentTexture);
               
               // Calculate scale to cover the tile (object-fit: cover behavior)
-              const scaleX = tileSize / texture.width;
-              const scaleY = tileSize / texture.height;
+              const scaleX = tileSize / currentTexture.width;
+              const scaleY = tileSize / currentTexture.height;
               const scale = Math.max(scaleX, scaleY); // Use max for cover behavior
               
               sprite.scale.set(scale);
               
               // Center the sprite within the tile
-              sprite.x = actualX + (tileSize - texture.width * scale) / 2;
-              sprite.y = y + (tileSize - texture.height * scale) / 2;
+              sprite.x = actualX + (tileSize - currentTexture.width * scale) / 2;
+              sprite.y = y + (tileSize - currentTexture.height * scale) / 2;
               
               // Create a mask to ensure content doesn't overflow the tile
               const mask = new PIXI.Graphics();
@@ -140,8 +165,6 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
               app.stage.addChild(mask);
               app.stage.addChild(sprite);
               tileSprites.push(sprite);
-              
-              tileIndex++; // Move to next texture for next tile
             }
             rowIndex++;
           }
@@ -258,7 +281,7 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
         containerRef.current.removeChild(containerRef.current.firstChild);
       }
     };
-  }, [media, tileSize, maskSource, maskVideoPath, rowOffset]);
+  }, [media, tileSize, maskSource, maskVideoPath, rowOffset, currentMediaIndex, blackAndWhite]);
 
   return (
     <>
@@ -287,6 +310,40 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
           onChange={(e) => setRowOffset(Number(e.target.value))}
           className="w-32 mb-4"
         />
+
+        {media.length > 1 && (
+          <>
+            <label className="block text-white text-sm mb-2">
+              Media: {media[currentMediaIndex]?.name || 'Unknown'}
+            </label>
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setCurrentMediaIndex((prev) => (prev - 1 + media.length) % media.length)}
+                className="px-2 py-1 bg-white/20 text-white text-xs rounded hover:bg-white/30"
+              >
+                ←
+              </button>
+              <span className="text-white text-xs px-2 py-1">
+                {currentMediaIndex + 1}/{media.length}
+              </span>
+              <button
+                onClick={() => setCurrentMediaIndex((prev) => (prev + 1) % media.length)}
+                className="px-2 py-1 bg-white/20 text-white text-xs rounded hover:bg-white/30"
+              >
+                →
+              </button>
+            </div>
+            <label className="flex items-center text-white text-sm mb-4">
+              <input
+                type="checkbox"
+                checked={autoSwitch}
+                onChange={(e) => setAutoSwitch(e.target.checked)}
+                className="mr-2"
+              />
+              Auto-switch every 10s
+            </label>
+          </>
+        )}
         
         {maskSource === 'pose' && (
           <label className="flex items-center text-white text-sm">
@@ -299,6 +356,16 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
             Show Skeleton Lines
           </label>
         )}
+
+        <label className="flex items-center text-white text-sm mt-4">
+          <input
+            type="checkbox"
+            checked={blackAndWhite}
+            onChange={(e) => setBlackAndWhite(e.target.checked)}
+            className="mr-2"
+          />
+          Black & White Filter
+        </label>
       </div>
 
       {/* Mask Source Info */}
