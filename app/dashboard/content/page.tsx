@@ -11,7 +11,7 @@ type FileItem = {
   project?: string;
 };
 
-export default function Dashboard() {
+export default function ContentDashboard() {
   const [projects, setProjects] = useState<FileItem[]>([]);
   const [selectedProject, setSelectedProject] = useState<FileItem | null>(null);
   const [media, setMedia] = useState<FileItem[]>([]);
@@ -118,49 +118,49 @@ export default function Dashboard() {
         {selectedProject ? (
           <>
             <div className="flex justify-between items-center mb-6">
-  <h1 className="text-2xl font-semibold">{selectedProject.name}</h1>
-  <div className="space-x-2">
-    {Object.keys(pendingRenames).length > 0 && (
-      <>
-        <button
-          onClick={applyRenames}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded shadow"
-        >
-          Save Changes ({Object.keys(pendingRenames).length})
-        </button>
-        <button
-          onClick={() => setPendingRenames({})}
-          className="bg-gray-200 hover:bg-gray-300 text-sm px-3 py-2 rounded"
-        >
-          Reset Changes
-        </button>
-      </>
-    )}
-    {media.length > 0 && (
-      <button
-        onClick={() => {
-          const allHidden = media.every(item =>
-            (pendingRenames[item.path] ?? item.name).startsWith('_hide_')
-          );
-          const newRenames: Record<string, string> = {};
-          media.forEach(item => {
-            const effectiveName = pendingRenames[item.path] ?? item.name;
-            const shouldHide = !allHidden; // toggle based on current majority
-            newRenames[item.path] = shouldHide
-              ? effectiveName.startsWith('_hide_') ? effectiveName : `_hide_${effectiveName}`
-              : effectiveName.replace(/^_hide_/, '');
-          });
-          setPendingRenames(newRenames);
-        }}
-        className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-2 rounded"
-      >
-        {media.every(item => (pendingRenames[item.path] ?? item.name).startsWith('_hide_'))
-          ? 'Unhide All'
-          : 'Hide All'}
-      </button>
-    )}
-  </div>
-</div>
+              <h1 className="text-2xl font-semibold">{selectedProject.name}</h1>
+              <div className="space-x-2">
+                {Object.keys(pendingRenames).length > 0 && (
+                  <>
+                    <button
+                      onClick={applyRenames}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded shadow"
+                    >
+                      Save Changes ({Object.keys(pendingRenames).length})
+                    </button>
+                    <button
+                      onClick={() => setPendingRenames({})}
+                      className="bg-gray-200 hover:bg-gray-300 text-sm px-3 py-2 rounded"
+                    >
+                      Reset Changes
+                    </button>
+                  </>
+                )}
+                {media.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const allHidden = media.every(item =>
+                        (pendingRenames[item.path] ?? item.name).startsWith('_hide_')
+                      );
+                      const newRenames: Record<string, string> = {};
+                      media.forEach(item => {
+                        const effectiveName = pendingRenames[item.path] ?? item.name;
+                        const shouldHide = !allHidden; // toggle based on current majority
+                        newRenames[item.path] = shouldHide
+                          ? effectiveName.startsWith('_hide_') ? effectiveName : `_hide_${effectiveName}`
+                          : effectiveName.replace(/^_hide_/, '');
+                      });
+                      setPendingRenames(newRenames);
+                    }}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-2 rounded"
+                  >
+                    {media.every(item => (pendingRenames[item.path] ?? item.name).startsWith('_hide_'))
+                      ? 'Unhide All'
+                      : 'Hide All'}
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div className="grid grid-cols-4 gap-4">
               {media.map((item, index) => {
@@ -172,7 +172,6 @@ export default function Dashboard() {
                   <div
                     key={item.path}
                     tabIndex={0}
-                    
                     onFocus={() => setFocusedIndex(index)}
                     className={`relative aspect-square overflow-hidden bg-gray-100 transition-all outline-none focus:ring-2 focus:ring-yellow-400 rounded ${
                       isHidden ? 'opacity-50 grayscale' : ''
@@ -180,9 +179,9 @@ export default function Dashboard() {
                   >
                     {/\.mp4$/i.test(item.name) ? (
                       <LazyVideo
-                      src={`/content/${item.path}`}
-                      className="w-full h-full object-cover"
-                    />
+                        src={`/content/${item.path}`}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <Image
                         unoptimized
@@ -200,13 +199,20 @@ export default function Dashboard() {
                         Pending
                       </div>
                     )}
+
+                    <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1 py-0.5 rounded text-center">
+                      {getEffectiveName(item).replace(/\.[^/.]+$/, '').substring(0, 20)}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </>
         ) : (
-          <p className="text-gray-400">Select a project to view media</p>
+          <div className="text-center py-20">
+            <h2 className="text-xl text-gray-500 mb-2">Select a project</h2>
+            <p className="text-gray-400">Choose a project from the sidebar to view and manage its media files.</p>
+          </div>
         )}
       </div>
     </div>

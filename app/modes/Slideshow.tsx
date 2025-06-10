@@ -113,18 +113,19 @@ export default function Slideshow({ media }: SlideshowProps) {
     );
   };
 
+  
   return (
     <div className="flex w-full h-screen">
       {isSingleItem ? (
         // Single item takes full width and height
-        <div className="w-full h-full overflow-hidden flex items-center justify-center">
-          {renderMediaItem(currentItems[0], 'top', 'center')}
+        <div className="w-full h-full overflow-hidden flex items-center justify-start">
+          {renderMediaItem(currentItems[0], Math.random() < 0.5 ? 'top' : 'bottom', Math.random() < 0.5 ? 'left' : 'right')}
         </div>
       ) : (
         <>
           {/* Left Container - 50% width, full height */}
-          <div className="w-1/2 h-full overflow-hidden">
-            {currentItems[0] && renderMediaItem(currentItems[0], 'top', 'center')}
+          <div className="w-1/2 h-full overflow-hidden justify-start">
+            {currentItems[0] && renderMediaItem(currentItems[0], 'top', 'left')}
           </div>
           
           {/* Right Container - 50% width, full height */}
