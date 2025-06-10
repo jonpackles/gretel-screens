@@ -1,5 +1,9 @@
 [
   {
+    "mode": "Pose House",
+    "duration": 300000
+  },
+  {
     "mode": "Vertical Carousel",
     "duration": 300000,
     "mediaPath": "linked-content/posters"
