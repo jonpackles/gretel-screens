@@ -7,9 +7,5 @@
     "mode": "Vertical Carousel",
     "duration": 300000,
     "mediaPath": "linked-content/posters"
-  },
-  {
-    "mode": "Calendar",
-    "duration": 300000
   }
 ]

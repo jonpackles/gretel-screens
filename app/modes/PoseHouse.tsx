@@ -56,10 +56,10 @@ export default function PoseHouse({}: PoseHouseProps) {
   // Pose landmark indices for mapping (full body only)
   const poseMappings = [
     0,  // nose -> house peak
-    15, // right wrist -> top right
-    27, // right ankle -> bottom right  
-    28, // left ankle -> bottom left
-    16, // left wrist -> top left
+    16, // right wrist -> top right
+    28, // right ankle -> bottom right  
+    27, // left ankle -> bottom left
+    15, // left wrist -> top left
   ];
 
   // Start pose detection on mount
@@ -146,7 +146,7 @@ export default function PoseHouse({}: PoseHouseProps) {
       });
       graphics.poly(points);
       graphics.stroke({ width: 2, color: 0xffffff }); // Add white stroke with width of 2
-      graphics.fill(0xffffff); 
+      
     };
 
     const updateHouseFromPose = () => {

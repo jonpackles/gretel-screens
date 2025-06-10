@@ -35,9 +35,9 @@ export default function Page() {
   if (loading) return <div className="text-center p-10">Loading…</div>;
   if (!media.length) return <div className="text-center p-10">No media found.</div>;
 
-  const randomVideos = Array.from({ length: 20}, () => media[Math.floor(Math.random() * media.length)]);
+  const randomVideos = Array.from({ length: 70}, () => media[Math.floor(Math.random() * media.length)]);
 
-  // return <Mosaic media={randomVideos} maskSource={'pose'} />;
-  return <Glass />;
+  return <Paths media={randomVideos} pathData={{ svgPath: 'house.svg', animationSpeed: 6 }} />;
+
  
 }
