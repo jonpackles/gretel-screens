@@ -29,7 +29,6 @@ export default function Calendar() {
                   key={event.id + '-' + idx}
                   onClick={() => {
                     console.log('Event clicked:', event);
-                
                    
                   }}
                 >
