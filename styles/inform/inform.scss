@@ -1,0 +1,198 @@
+:root {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+#inform {
+  --h1-poster: clamp(80px, 8vw, 13vw);
+  --h2-poster: clamp(60px, 6vw, 192px);
+  --h3-poster: clamp(40px, 4vw, 128px);
+  --h1-list: clamp(40px, 3vw, 5vw);
+  --h2-list: clamp(32px, 2.5vw, 72px);
+  --h3-list: clamp(24px, 2vw, 48px);
+  
+
+  --basel: var(--font-basel);
+  --quadrant: var(--font-quadrant);
+  --droulers: var(--font-droulers);
+
+  font-family: var(--basel);
+
+  color: white;
+  line-height: 1.2;
+
+  
+}
+
+
+.block-wrapper {
+  
+  transition: all 0.3s ease;
+  position: relative;
+  margin-bottom: 24px;
+  cursor: pointer;
+
+ 
+
+  .tag {
+    width: fit-content;
+    padding: 8px 16px;
+    border: 2px solid #fff;
+    border-radius: 100px;
+    font-family: var(--droulers);
+    text-transform: uppercase;
+  }
+
+  &--list {
+    margin: 24px;
+
+    & > * {
+      border-top: 2px solid #fff;
+      padding:8px;
+      padding-top: 8px;
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      min-height: 20vh;
+    }
+
+    h1 {
+      font-size: var(--h1-list);
+    }
+
+    h2 {
+      font-size: var(--h2-list);
+    }
+
+    h3 {
+      font-size: var(--h3-list);
+    }
+
+    .date {
+      font-family: var(--quadrant);
+      font-size: var(--h1-list);
+    }
+
+    .body {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .info {
+      display: flex;
+      justify-content: space-between;
+      
+
+      & > * {
+        width: 50%;
+      }
+    }
+
+    .gretel-logo {
+      height: 18px;
+    }
+  }
+
+  &--poster {
+    & > * {
+      border-top: 2px solid #fff;
+      height: 100vh;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    h1 {
+      font-size: var(--h1-poster);
+    }
+
+    h2 {
+      font-size: var(--h2-poster);
+    }
+
+    h3 {
+      font-size: var(--h3-poster);
+    }
+
+    p, h3 {
+        border-top: 2px solid #fff;
+        padding-top: 8px;  
+        margin-top: 8px;
+    }
+    .info {
+      border-top: 2px solid #fff;
+      padding-top: 8px;
+      font-size: 24px;
+    }
+
+    .gretel-logo {
+      height: 24px;
+    }
+  }
+
+  // Internal vs External styling
+  &--internal {
+    background-color: #fff;
+    color: #000;
+
+    h1 {
+      font-family: var(--droulers);
+    }
+
+    .tag {
+      border-color: #000;
+      color: #000;
+    }
+
+    & > * {
+      border-top-color: #000 !important;
+    }
+
+    .info {
+      border-top-color: #000 !important;
+    }
+
+    p, h3 {
+      border-top-color: #000 !important;
+    }
+
+   
+  }
+
+  &--external {
+    background-color: #000;
+    color: #fff;
+
+    .tag {
+      border-color: #fff;
+      color: #fff;
+    }
+
+    & > * {
+      border-top-color: #fff !important;
+    }
+
+    .info {
+      border-top-color: #fff !important;
+    }
+
+    p, h3 {
+      border-top-color: #fff !important;
+    }
+
+ 
+  }
+}
+
+
+.hidden {
+    // display: none;
+}

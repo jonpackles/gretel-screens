@@ -10,8 +10,9 @@ import VerticalCarousel from './VerticalCarousel';
 import Marquee from './Marquee';
 import Mosaic from './Mosaic';
 import Paths from './Paths';
-import Glass from './Glass';
+// import Glass from './Glass';
 import PoseHouse from './PoseHouse';
+import Inform from './Inform';
 
 // Utility function for proper array shuffling (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -72,16 +73,16 @@ const MODE_CONFIGS: ModeConfig[] = [
     props: { maskSource: 'pose' as const },
   },
   {
-    component: Glass,
-    name: 'Glass (Camera)',
-    duration: 30000, // 30 seconds
-    // Glass uses camera, no media needed
-  },
-  {
     component: PoseHouse,
     name: 'Pose House',
     duration: 30000, // 30 seconds
     // PoseHouse uses camera, no media needed
+  },
+  {
+    component: Inform,
+    name: 'Inform',
+    duration: 30000, // 30 seconds
+    // Inform doesn't need media
   },
 ];
 

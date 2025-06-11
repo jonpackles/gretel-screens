@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { MediaItem } from '../types/media';
+import styles from './modes.module.scss';
 
 type SlideshowProps = {
   media: MediaItem[];
