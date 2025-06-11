@@ -16,6 +16,8 @@
   --h1-list: clamp(40px, 3vw, 5vw);
   --h2-list: clamp(32px, 2.5vw, 72px);
   --h3-list: clamp(24px, 2vw, 48px);
+
+  --big-date: clamp(40px, 4vw, 6vw);
   
 
   --basel: var(--font-basel);
@@ -35,7 +37,7 @@
   
   transition: all 0.3s ease;
   position: relative;
-  margin-bottom: 24px;
+//   margin-bottom: 24px;
   cursor: pointer;
 
  
@@ -59,6 +61,7 @@
       display: grid;
       grid-template-columns: 1fr 2fr;
       min-height: 20vh;
+    
     }
 
     h1 {
@@ -75,7 +78,7 @@
 
     .date {
       font-family: var(--quadrant);
-      font-size: var(--h1-list);
+      font-size: var(--big-date);
     }
 
     .body {
@@ -87,7 +90,7 @@
 
     .info {
       display: flex;
-      justify-content: space-between;
+    //   justify-content: space-between;
       
 
       & > * {
@@ -97,17 +100,21 @@
 
     .gretel-logo {
       height: 18px;
+      width: fit-content;
+      
     }
   }
 
   &--poster {
     & > * {
       border-top: 2px solid #fff;
+      
       height: 100vh;
       padding: 24px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+    
     }
 
     h1 {
@@ -131,6 +138,10 @@
       border-top: 2px solid #fff;
       padding-top: 8px;
       font-size: 24px;
+    }
+
+    .info > * {
+        padding-bottom: 8px;
     }
 
     .gretel-logo {
@@ -192,7 +203,14 @@
   }
 }
 
+.gretel-logo {
+  height: 24px;
+  
+  .block-wrapper--poster & {
+    height: 32px;
+  }
+}
 
 .hidden {
-    // display: none;
+    display: none;
 }

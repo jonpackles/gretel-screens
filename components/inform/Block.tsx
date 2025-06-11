@@ -1,60 +1,65 @@
 'use client';
 
-import React, { useState } from "react";
-import AnnouncementBlock from "./AnnouncementBlock";
-import EventBlock from "./EventBlock";
-import ProjectBlock from "./ProjectBlock";
-import { ContentBlock } from "@/types/inform/inform";
-import styles from "./inform.module.scss";
+import { useState, useRef } from "react";
+import AnnouncementBlock from "./blocks/AnnouncementBlock";
+import EventBlock from "./blocks/EventBlock";
+import ProjectBlock from "./blocks/ProjectBlock";
+
+// Format date to M/DD format
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const month = date.getMonth() + 1; // getMonth() returns 0-11
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${month}/${day}`;
+}
 
 type Props = {
-  type: ContentBlock["type"];
+  type: string;
   data: any;
+  internal: boolean;
 };
 
-export default function Block({ type, data }: Props) {
+export default function Block({ type, data, internal }: Props) {
   const [mode, setMode] = useState<"poster" | "list">("list");
+  const blockRef = useRef<HTMLDivElement>(null);
 
   const toggleMode = () => {
-    setMode(prev => prev === "poster" ? "list" : "poster");
+    const newMode = mode === "poster" ? "list" : "poster";
+    setMode(newMode);
+    
+    // If switching to poster mode, scroll to top
+    if (newMode === "poster" && blockRef.current) {
+      setTimeout(() => {
+        blockRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+    }
   };
 
-  // Debug: Log the CSS classes being applied
-  const wrapperClass = `${styles.blockWrapper} ${mode === 'poster' ? styles['blockWrapper--poster'] : styles['blockWrapper--list']}`;
-  console.log('Block CSS classes:', {
-    mode,
-    blockWrapper: styles.blockWrapper,
-    modeClass: mode === 'poster' ? styles['blockWrapper--poster'] : styles['blockWrapper--list'],
-    fullClass: wrapperClass,
-    allStyles: styles
-  });
+  const renderContent = () => {
+    switch (type) {
+      case "announcement":
+        return <AnnouncementBlock data={data} mode={mode} formatDate={formatDate} />;
+      case "event":
+        return <EventBlock data={data} mode={mode} formatDate={formatDate} />;
+      case "project":
+        return <ProjectBlock data={data} mode={mode} />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className={wrapperClass}>
-      {/* Mode Toggle Button */}
-      <button 
-        onClick={toggleMode}
-        className={`${styles.modeToggle} ${mode === 'poster' ? styles['modeToggle--poster'] : styles['modeToggle--list']}`}
-        aria-label={`Switch to ${mode === "poster" ? "list" : "poster"} view`}
-      >
-        {mode === "poster" ? "📋" : "🖼️"}
-      </button>
-
-      {/* Block Content */}
-      <div className={styles.blockContent}>
-        {(() => {
-          switch (type) {
-            case "announcement":
-              return <AnnouncementBlock data={data} mode={mode} />;
-            case "event":
-              return <EventBlock data={data} mode={mode} />;
-            case "project":
-              return <ProjectBlock data={data} mode={mode} />;
-            default:
-              return null;
-          }
-        })()}
-      </div>
+    <div 
+      ref={blockRef}
+      className={`block-wrapper block-wrapper--${mode} block-wrapper--${internal ? 'internal' : 'external'}`}
+      onClick={toggleMode}
+      style={{ cursor: 'pointer' }}
+      aria-label={`Switch to ${mode === "poster" ? "list" : "poster"} view`}
+    >
+      {renderContent()}
     </div>
   );
 }
