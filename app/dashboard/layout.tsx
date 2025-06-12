@@ -36,7 +36,7 @@ export default function DashboardLayout({
           </div> */}
           
           {/* Navigation Tabs */}
-          <div className="mt-6">
+          <div className="">
             <nav className="flex space-x-8">
               {navItems.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/');

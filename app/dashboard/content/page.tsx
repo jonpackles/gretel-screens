@@ -118,49 +118,49 @@ export default function ContentDashboard() {
         {selectedProject ? (
           <>
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-semibold">{selectedProject.name}</h1>
-              <div className="space-x-2">
-                {Object.keys(pendingRenames).length > 0 && (
-                  <>
-                    <button
-                      onClick={applyRenames}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded shadow"
-                    >
-                      Save Changes ({Object.keys(pendingRenames).length})
-                    </button>
-                    <button
-                      onClick={() => setPendingRenames({})}
-                      className="bg-gray-200 hover:bg-gray-300 text-sm px-3 py-2 rounded"
-                    >
-                      Reset Changes
-                    </button>
-                  </>
-                )}
-                {media.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const allHidden = media.every(item =>
-                        (pendingRenames[item.path] ?? item.name).startsWith('_hide_')
-                      );
-                      const newRenames: Record<string, string> = {};
-                      media.forEach(item => {
-                        const effectiveName = pendingRenames[item.path] ?? item.name;
-                        const shouldHide = !allHidden; // toggle based on current majority
-                        newRenames[item.path] = shouldHide
-                          ? effectiveName.startsWith('_hide_') ? effectiveName : `_hide_${effectiveName}`
-                          : effectiveName.replace(/^_hide_/, '');
-                      });
-                      setPendingRenames(newRenames);
-                    }}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-2 rounded"
-                  >
-                    {media.every(item => (pendingRenames[item.path] ?? item.name).startsWith('_hide_'))
-                      ? 'Unhide All'
-                      : 'Hide All'}
-                  </button>
-                )}
-              </div>
-            </div>
+  <h1 className="text-2xl font-semibold">{selectedProject.name}</h1>
+  <div className="space-x-2">
+    {Object.keys(pendingRenames).length > 0 && (
+      <>
+        <button
+          onClick={applyRenames}
+          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded shadow"
+        >
+          Save Changes ({Object.keys(pendingRenames).length})
+        </button>
+        <button
+          onClick={() => setPendingRenames({})}
+          className="bg-gray-200 hover:bg-gray-300 text-sm px-3 py-2 rounded"
+        >
+          Reset Changes
+        </button>
+      </>
+    )}
+    {media.length > 0 && (
+      <button
+        onClick={() => {
+          const allHidden = media.every(item =>
+            (pendingRenames[item.path] ?? item.name).startsWith('_hide_')
+          );
+          const newRenames: Record<string, string> = {};
+          media.forEach(item => {
+            const effectiveName = pendingRenames[item.path] ?? item.name;
+            const shouldHide = !allHidden; // toggle based on current majority
+            newRenames[item.path] = shouldHide
+              ? effectiveName.startsWith('_hide_') ? effectiveName : `_hide_${effectiveName}`
+              : effectiveName.replace(/^_hide_/, '');
+          });
+          setPendingRenames(newRenames);
+        }}
+        className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-2 rounded"
+      >
+        {media.every(item => (pendingRenames[item.path] ?? item.name).startsWith('_hide_'))
+          ? 'Unhide All'
+          : 'Hide All'}
+      </button>
+    )}
+  </div>
+</div>
 
             <div className="grid grid-cols-4 gap-4">
               {media.map((item, index) => {
@@ -179,9 +179,9 @@ export default function ContentDashboard() {
                   >
                     {/\.mp4$/i.test(item.name) ? (
                       <LazyVideo
-                        src={`/content/${item.path}`}
-                        className="w-full h-full object-cover"
-                      />
+                      src={`/content/${item.path}`}
+                      className="w-full h-full object-cover"
+                    />
                     ) : (
                       <Image
                         unoptimized

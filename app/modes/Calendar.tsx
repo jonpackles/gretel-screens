@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Event } from '@/components/calendar/Event';
+import styles from './modes.module.scss';
 
 export default function Calendar() {
   const [events, setEvents] = useState<any[]>([]);
@@ -21,7 +22,7 @@ export default function Calendar() {
   }, []);
 
   return (
-    <div className="p-4" id="calendar">
+    <div className={styles.modeContainer} id="calendar">
     
       <pre className="whitespace-pre-wrap">
       {[...events, ...events].map((event, idx) => (

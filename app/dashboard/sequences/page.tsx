@@ -10,7 +10,10 @@ const AVAILABLE_MODES = [
   'Calendar',
   'Mosaic',
   'Glass (Camera)',
-  'Pose House'
+  'Pose House',
+  'Inform Calendar',
+  'Inform Projects',
+  'Grid',
 ];
 
 const AVAILABLE_SCREENS = ['screen-a', 'screen-b'];
