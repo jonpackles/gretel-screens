@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { MediaItem } from '../types/media';
+import styles from './modes.module.scss';
 
 type SlideshowProps = {
   media: MediaItem[];
@@ -10,112 +11,96 @@ type SlideshowProps = {
 
 export default function Slideshow({ media }: SlideshowProps) {
   const [currentItems, setCurrentItems] = useState<MediaItem[]>([]);
-
+  const [cycleDuration] = useState(4000); // 4 seconds
+  
   useEffect(() => {
-    if (!media.length) return;
-    
-    const pickRandom = () => {
+    if (!media?.length) return;
+
+    const updateItems = () => {
+      // Get 1-2 random items
       const shuffled = [...media].sort(() => Math.random() - 0.5);
-      const count = Math.random() < 0.5 ? 1 : 2;
-      
-      if (count === 1) {
-        // Single item - pick any random item
-        setCurrentItems(shuffled.slice(0, 1));
-      } else {
-        // Two items - ensure they're from the same project
-        
-        // Group media by project (extract from path)
-        const projectGroups: { [project: string]: MediaItem[] } = {};
-        
-        media.forEach(item => {
-          // Extract project from path (e.g., "linked-content/projects/PROJECT_NAME/...")
-          const pathParts = item.path.split('/');
-          const project = pathParts.length >= 3 ? pathParts[2] : 'unknown';
-          
-          if (!projectGroups[project]) {
-            projectGroups[project] = [];
-          }
-          projectGroups[project].push(item);
-        });
-        
-        // Find projects that have 2+ items
-        const projectsWithMultipleItems = Object.entries(projectGroups)
-          .filter(([_, items]) => items.length >= 2);
-        
-        if (projectsWithMultipleItems.length > 0) {
-          // Pick a random project with multiple items
-          const [_, projectItems] = projectsWithMultipleItems[
-            Math.floor(Math.random() * projectsWithMultipleItems.length)
-          ];
-          
-          // Pick 2 random items from that project
-          const shuffledProjectItems = [...projectItems].sort(() => Math.random() - 0.5);
-          setCurrentItems(shuffledProjectItems.slice(0, 2));
-        } else {
-          // Fallback: if no project has 2+ items, just show 1 item
-          setCurrentItems(shuffled.slice(0, 1));
-        }
-      }
+      const itemCount = Math.random() > 0.7 ? 1 : 2; // 30% chance of single item
+      setCurrentItems(shuffled.slice(0, itemCount));
     };
 
-    pickRandom();
-    const interval = setInterval(pickRandom, 10000); // every 30s
+    // Initial load
+    updateItems();
+
+    // Set up interval
+    const interval = setInterval(updateItems, cycleDuration);
     return () => clearInterval(interval);
-  }, [media]);
+  }, [media, cycleDuration]);
 
-  // Log current items whenever they change
-  useEffect(() => {
-    if (currentItems.length > 0) {
-      console.log('Currently showing media items:', currentItems);
-    }
-  }, [currentItems]);
+  const renderMediaItem = (item: MediaItem, verticalAlign: 'top' | 'bottom', horizontalAlign: 'left' | 'right') => {
+    const isVideo = /\.(mp4|webm|ogg)$/i.test(item.name);
+    const src = `/content/${item.path}`;
 
-  const isSingleItem = currentItems.length === 1;
+    // Determine alignment classes
+    const alignmentClasses = {
+      vertical: verticalAlign === 'top' ? 'items-start' : 'items-end',
+      horizontal: horizontalAlign === 'left' ? 'justify-start' : 'justify-end'
+    };
 
-  const renderMediaItem = (item: MediaItem, anchor: 'top' | 'bottom', horizontalAnchor: 'left' | 'right' | 'center' = 'center') => {
-    const verticalClass = anchor === 'top' ? 'items-start' : 'items-end';
-    const horizontalClass = horizontalAnchor === 'left' ? 'justify-start' : 
-                           horizontalAnchor === 'right' ? 'justify-end' : 'justify-center';
-    
-    return item.name.match(/\.(mp4)$/i) ? (
-      <div className={`flex ${verticalClass} ${horizontalClass} w-full h-full`}>
-        <video
-          key={item.path}
-          src={`/content/${item.path}`}
-          className="max-w-full max-h-full object-contain"
-          autoPlay
-          muted
-          loop
-          playsInline
-        />
-      </div>
-    ) : (
-      <div className={`flex ${verticalClass} ${horizontalClass} w-full h-full`}>
-        <div className="relative max-w-full max-h-full">
-          <Image
-            onLoadingComplete={() => {
-              console.log('Image loaded:', {
-                name: item.name,
-                type: item.type,
-                path: item.path
-              });
-            }}
-            src={`/content/${item.path}`}
-            alt={item.name}
-            width={0}
-            height={0}
-            className="w-auto h-auto max-w-full max-h-full object-contain"
-            sizes="50vw"
-            style={{ width: 'auto', height: 'auto' }}
-          />
+    if (isVideo) {
+      return (
+        <div className={`w-full h-full flex ${alignmentClasses.vertical} ${alignmentClasses.horizontal}`}>
+          <video
+            key={src}
+            className="max-w-full max-h-full object-contain"
+            autoPlay
+            muted
+            loop
+            playsInline
+          >
+            <source src={src} type="video/mp4" />
+          </video>
         </div>
+      );
+    }
+
+    return (
+      <div className={`w-full h-full flex ${alignmentClasses.vertical} ${alignmentClasses.horizontal}`}>
+        <Image
+          key={src}
+          src={src}
+          alt={item.name}
+          width={1920}
+          height={1080}
+          className="max-w-full max-h-full object-contain"
+          priority
+          style={{
+            width: 'auto',
+            height: 'auto',
+          }}
+        />
       </div>
     );
   };
 
-  
+  if (!media?.length) {
+    return (
+      <div className={styles.modeContainer}>
+        <div className="flex items-center justify-center h-full text-white text-2xl">
+          No media available
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentItems.length) {
+    return (
+      <div className={styles.modeContainer}>
+        <div className="flex items-center justify-center h-full text-white text-2xl">
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  const isSingleItem = currentItems.length === 1;
+
   return (
-    <div className="flex w-full h-screen">
+    <div className={`${styles.modeContainer} flex`}>
       {isSingleItem ? (
         // Single item takes full width and height
         <div className="w-full h-full overflow-hidden flex items-center justify-start">

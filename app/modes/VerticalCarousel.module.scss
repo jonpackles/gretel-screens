@@ -1,7 +1,6 @@
 .carouselWrapper {
-    overflow: hidden;
-    height: 100vh;
-    position: relative;
+    // modeContainer now handles: width, height, overflow, position, etc.
+    // Keep only carousel-specific styles here
   }
   
   .innerTrack {

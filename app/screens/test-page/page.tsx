@@ -5,6 +5,7 @@ import Mosaic from '../../modes/Mosaic';
 import Paths from '../../modes/Paths';
 import Glass from '../../modes/Glass';
 import { MediaItem } from '../../types/media';
+import Grid from '@/app/modes/Grid';
 
 export default function Page() {
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -35,9 +36,9 @@ export default function Page() {
   if (loading) return <div className="text-center p-10">Loading…</div>;
   if (!media.length) return <div className="text-center p-10">No media found.</div>;
 
-  const randomVideos = Array.from({ length: 70}, () => media[Math.floor(Math.random() * media.length)]);
+  const randomVideos = Array.from({ length: 98}, () => media[Math.floor(Math.random() * media.length)]);
 
-  return <Paths media={randomVideos} pathData={{ svgPath: 'house.svg', animationSpeed: 6 }} />;
+  return <Grid media={randomVideos} />;
 
  
 }

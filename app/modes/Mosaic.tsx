@@ -1,50 +1,38 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import * as PIXI from 'pixi.js'; 
+import * as PIXI from 'pixi.js';
 import { MediaItem } from '../types/media';
-import PoseMask from '@/components/mosaic-masks/PoseMask';
+import styles from './modes.module.scss';
 
-interface MosaicProps {
+type MosaicProps = {
   media: MediaItem[];
-  maskSource: 'pose' | 'video' | null;
+  maskSource?: 'pose' | 'video' | null;
   maskVideoPath?: string;
-}
+};
 
 export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const [tileSize, setTileSize] = useState(75);
-  const [showSkeleton, setShowSkeleton] = useState(true);
   const [rowOffset, setRowOffset] = useState(0);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-  const [autoSwitch, setAutoSwitch] = useState(true);
   const [blackAndWhite, setBlackAndWhite] = useState(false);
-  const showSkeletonRef = useRef(showSkeleton);
 
-  // Update ref when state changes
+  let animationId: number;
+
+  // Cycle through media every 5 seconds
   useEffect(() => {
-    showSkeletonRef.current = showSkeleton;
-  }, [showSkeleton]);
-
-  // Auto-switch between media items every 10 seconds
-  useEffect(() => {
-    if (!autoSwitch || media.length <= 1) return;
-
+    if (!media.length) return;
+    
     const interval = setInterval(() => {
-      setCurrentMediaIndex((prev) => (prev + 1) % media.length);
-    }, 10000); // 10 seconds
-
+      setCurrentMediaIndex(prev => (prev + 1) % media.length);
+    }, 5000);
+    
     return () => clearInterval(interval);
-  }, [autoSwitch, media.length]);
-
-  if (!media.length) return <div>Waiting for media...</div>;
+  }, [media.length]);
 
   useEffect(() => {
-    let cameraStream: MediaStream | null = null;
-    let animationId: number;
-    let poseMaskInstance: PoseMask | null = null;
-
     const initPIXI = async () => {
       if (!containerRef.current || !media.length) return;
 
@@ -60,7 +48,7 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
           containerRef.current.removeChild(containerRef.current.firstChild);
         }
 
-        // Create PIXI application with v8 async initialization
+        // Create PIXI application
         const app = new PIXI.Application();
         
         await app.init({
@@ -69,193 +57,65 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
           backgroundColor: 0x000000,
         });
 
-        // Add canvas to DOM - v8 uses app.canvas instead of app.view
         if (app.canvas && containerRef.current) {
           containerRef.current.appendChild(app.canvas);
           appRef.current = app;
 
-          // Create black and white filter
-          const colorMatrixFilter = new PIXI.ColorMatrixFilter();
-          colorMatrixFilter.desaturate();
-          
-          // Apply or remove filter based on state
-          if (blackAndWhite) {
-            app.stage.filters = [colorMatrixFilter];
-          } else {
-            app.stage.filters = [];
-          }
+          // Load current media texture
+          const currentMedia = media[currentMediaIndex];
+          const texture = await PIXI.Assets.load(`/content/${currentMedia.path}`);
 
-          // Create textures from all media items
-          const textures: PIXI.Texture[] = [];
-          
-          for (let i = 0; i < media.length; i++) {
-            const mediaItem = media[i];
-            let texture: PIXI.Texture;
-            
-            if (mediaItem.name.match(/\.(mp4)$/i)) {
-              // Video texture
-              const video = document.createElement('video');
-              video.src = `/content/${mediaItem.path}`;
-              video.muted = true;
-              video.loop = true;
-              video.autoplay = true;
-              video.playsInline = true;
-              
-              await new Promise((resolve) => {
-                video.onloadeddata = () => resolve(true);
-              });
-              
-              texture = PIXI.Texture.from(video);
-            } else {
-              // Image texture
-              texture = await PIXI.Assets.load(`/content/${mediaItem.path}`);
-            }
-            
-            textures.push(texture);
-          }
+          const createMosaic = () => {
+            // Clear stage
+            app.stage.removeChildren();
 
-          console.log(`Created ${textures.length} textures from media items`);
-
-          // Create mosaic grid - store all sprites for pose interaction
-          const tileSprites: PIXI.Sprite[] = [];
-          const tileMetadata = new Map<PIXI.Sprite, { tileX: number, tileY: number, tileSize: number }>();
-          const tileDelays = new Map<PIXI.Sprite, number>(); // Track delay frames for each tile
-          
-          // Use only the currently selected texture for all tiles
-          const currentTexture = textures[currentMediaIndex % textures.length];
-          let rowIndex = 0; // Track which row we're on for offset
-          
-          for (let y = 0; y < app.screen.height; y += tileSize) {
-            const offsetX = (rowIndex % 2) * (rowOffset / 100) * tileSize; // Apply offset to alternate rows
+            const screenWidth = app.screen.width;
+            const screenHeight = app.screen.height;
             
-            for (let x = -tileSize; x < app.screen.width + tileSize; x += tileSize) { // Extended range to handle offsets
-              const actualX = x + offsetX;
-              
-              // Skip tiles that are completely off-screen
-              if (actualX + tileSize < 0 || actualX > app.screen.width) continue;
-              
-              // Use the same texture for all tiles
-              const sprite = new PIXI.Sprite(currentTexture);
-              
-              // Calculate scale to cover the tile (object-fit: cover behavior)
-              const scaleX = tileSize / currentTexture.width;
-              const scaleY = tileSize / currentTexture.height;
-              const scale = Math.max(scaleX, scaleY); // Use max for cover behavior
-              
-              sprite.scale.set(scale);
-              
-              // Center the sprite within the tile
-              sprite.x = actualX + (tileSize - currentTexture.width * scale) / 2;
-              sprite.y = y + (tileSize - currentTexture.height * scale) / 2;
-              
-              // Create a mask to ensure content doesn't overflow the tile
-              const mask = new PIXI.Graphics();
-              mask.rect(actualX, y, tileSize, tileSize);
-              mask.fill(0xffffff);
-              sprite.mask = mask;
-              
-              // Initially hide all tiles
-              sprite.visible = false;
-              sprite.alpha = 1.0;
-              
-              // Store tile info for pose interaction (use logical position for calculations)
-              tileMetadata.set(sprite, { tileX: actualX, tileY: y, tileSize });
-              tileDelays.set(sprite, 0); // Initialize delay counter
-              
-              app.stage.addChild(mask);
-              app.stage.addChild(sprite);
-              tileSprites.push(sprite);
-            }
-            rowIndex++;
-          }
+            const cols = Math.ceil(screenWidth / tileSize);
+            const rows = Math.ceil(screenHeight / tileSize);
 
-          // Handle different mask sources
-          if (maskSource === 'pose') {
-            // Use PoseMask component for pose detection
-            poseMaskInstance = new PoseMask(app, tileSprites, tileMetadata, tileDelays, showSkeletonRef);
-            await poseMaskInstance.initialize();
-            
-            const updateLoop = () => {
-              if (poseMaskInstance) {
-                poseMaskInstance.update();
+            // Create mosaic tiles
+            for (let row = 0; row < rows; row++) {
+              for (let col = 0; col < cols; col++) {
+                const sprite = new PIXI.Sprite(texture);
+                
+                // Position tile
+                sprite.x = col * tileSize + (row % 2) * (rowOffset / 100) * tileSize;
+                sprite.y = row * tileSize;
+                
+                // Scale tile to fit tileSize
+                const scale = tileSize / Math.max(texture.width, texture.height);
+                sprite.scale.set(scale);
+                
+                // Apply black and white filter if enabled
+                if (blackAndWhite) {
+                  const colorMatrix = new PIXI.ColorMatrixFilter();
+                  colorMatrix.desaturate();
+                  sprite.filters = [colorMatrix];
+                }
+
+                app.stage.addChild(sprite);
               }
-              animationId = requestAnimationFrame(updateLoop);
-            };
-            updateLoop();
-            
-          } else if (maskSource === 'video' && maskVideoPath) {
-            // Use video as mask
-            const maskVideo = document.createElement('video');
-            maskVideo.src = `/content/${maskVideoPath}`;
-            maskVideo.muted = true;
-            maskVideo.loop = true;
-            maskVideo.autoplay = true;
-            maskVideo.playsInline = true;
-            
-            await new Promise((resolve) => {
-              maskVideo.onloadeddata = () => resolve(true);
-            });
+            }
+          };
 
-            const videoMaskLoop = () => {
-              // Create a simple threshold-based mask from video
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              
-              if (ctx && maskVideo.videoWidth > 0) {
-                canvas.width = maskVideo.videoWidth;
-                canvas.height = maskVideo.videoHeight;
-                ctx.drawImage(maskVideo, 0, 0);
-                
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data;
-                
-                // Reset all tiles
-                tileSprites.forEach(sprite => sprite.visible = false);
-                
-                // Show tiles based on video brightness
-                tileSprites.forEach(sprite => {
-                  const metadata = tileMetadata.get(sprite);
-                  if (metadata) {
-                    const tileCenterX = metadata.tileX + metadata.tileSize / 2;
-                    const tileCenterY = metadata.tileY + metadata.tileSize / 2;
-                    
-                    // Map screen coordinates to video coordinates
-                    const videoX = Math.floor((tileCenterX / app.screen.width) * canvas.width);
-                    const videoY = Math.floor((tileCenterY / app.screen.height) * canvas.height);
-                    
-                    if (videoX >= 0 && videoX < canvas.width && videoY >= 0 && videoY < canvas.height) {
-                      const pixelIndex = (videoY * canvas.width + videoX) * 4;
-                      const r = data[pixelIndex];
-                      const g = data[pixelIndex + 1];
-                      const b = data[pixelIndex + 2];
-                      
-                      // Calculate brightness
-                      const brightness = (r + g + b) / 3;
-                      
-                      // Show tile if brightness is above threshold
-                      if (brightness > 128) {
-                        sprite.visible = true;
-                        sprite.alpha = brightness / 255;
-                      }
-                    }
-                  }
-                });
-              }
-              
-              animationId = requestAnimationFrame(videoMaskLoop);
-            };
-            
-            videoMaskLoop();
-          } else {
-            // No mask - show all tiles
-            tileSprites.forEach(sprite => {
-              sprite.visible = true;
-              sprite.alpha = 1.0;
-            });
-          }
+          // Animation loop (simplified - no pose detection for now)
+          const animate = () => {
+            if (!appRef.current) return;
+            animationId = requestAnimationFrame(animate);
+          };
 
-        } else {
-          console.error('Failed to create PIXI canvas');
+          createMosaic();
+          animate();
+
+          // Recreate mosaic when settings change
+          const recreateMosaic = () => {
+            createMosaic();
+          };
+
+          // Store recreate function for later use
+          (window as any).recreateMosaic = recreateMosaic;
         }
       } catch (error) {
         console.error('Error initializing PIXI:', error);
@@ -269,10 +129,6 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
       if (animationId) {
         cancelAnimationFrame(animationId);
       }
-      if (poseMaskInstance) {
-        poseMaskInstance.destroy();
-        poseMaskInstance = null;
-      }
       if (appRef.current) {
         appRef.current.destroy(true);
         appRef.current = null;
@@ -282,6 +138,13 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
       }
     };
   }, [media, tileSize, maskSource, maskVideoPath, rowOffset, currentMediaIndex, blackAndWhite]);
+
+  // Trigger mosaic recreation when settings change
+  useEffect(() => {
+    if ((window as any).recreateMosaic) {
+      (window as any).recreateMosaic();
+    }
+  }, [tileSize, rowOffset, blackAndWhite]);
 
   return (
     <>
@@ -310,62 +173,24 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
           onChange={(e) => setRowOffset(Number(e.target.value))}
           className="w-32 mb-4"
         />
-
-        {media.length > 1 && (
-          <>
-            <label className="block text-white text-sm mb-2">
-              Media: {media[currentMediaIndex]?.name || 'Unknown'}
-            </label>
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setCurrentMediaIndex((prev) => (prev - 1 + media.length) % media.length)}
-                className="px-2 py-1 bg-white/20 text-white text-xs rounded hover:bg-white/30"
-              >
-                ←
-              </button>
-              <span className="text-white text-xs px-2 py-1">
-                {currentMediaIndex + 1}/{media.length}
-              </span>
-              <button
-                onClick={() => setCurrentMediaIndex((prev) => (prev + 1) % media.length)}
-                className="px-2 py-1 bg-white/20 text-white text-xs rounded hover:bg-white/30"
-              >
-                →
-              </button>
-            </div>
-            <label className="flex items-center text-white text-sm mb-4">
-              <input
-                type="checkbox"
-                checked={autoSwitch}
-                onChange={(e) => setAutoSwitch(e.target.checked)}
-                className="mr-2"
-              />
-              Auto-switch every 10s
-            </label>
-          </>
-        )}
         
-        {maskSource === 'pose' && (
-          <label className="flex items-center text-white text-sm">
-            <input
-              type="checkbox"
-              checked={showSkeleton}
-              onChange={(e) => setShowSkeleton(e.target.checked)}
-              className="mr-2"
-            />
-            Show Skeleton Lines
-          </label>
-        )}
-
-        <label className="flex items-center text-white text-sm mt-4">
+        <label className="block text-white text-sm mb-2">
           <input
             type="checkbox"
             checked={blackAndWhite}
             onChange={(e) => setBlackAndWhite(e.target.checked)}
             className="mr-2"
           />
-          Black & White Filter
+          Black & White
         </label>
+        
+        {media.length > 0 && (
+          <div className="text-white text-sm mt-4">
+            Media: {currentMediaIndex + 1}/{media.length}
+            <br />
+            {media[currentMediaIndex]?.name}
+          </div>
+        )}
       </div>
 
       {/* Mask Source Info */}
@@ -379,11 +204,7 @@ export default function Mosaic({ media, maskSource, maskVideoPath }: MosaicProps
       {/* PIXI Container */}
       <div 
         ref={containerRef} 
-        style={{ 
-          width: '100vw', 
-          height: '100vh',
-          overflow: 'hidden'
-        }} 
+        className={styles.modeContainer}
       />
     </>
   );

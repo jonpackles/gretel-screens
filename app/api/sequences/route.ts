@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   const screen = searchParams.get('screen');
   if (!screen) return new Response('Missing screen param', { status: 400 });
 
-  const filePath = path.join(process.cwd(), 'public/content/sequences', `${screen}.json`);
+  const filePath = path.join(process.cwd(), 'public/content/linked-content/sequences', `${screen}.json`);
   try {
     const data = await fs.promises.readFile(filePath, 'utf8');
     return new Response(data, { status: 200 });
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     return new Response('Invalid input', { status: 400 });
   }
 
-  const filePath = path.join(process.cwd(), 'public/content/sequences', `${screen}.json`);
+  const filePath = path.join(process.cwd(), 'public/content/linked-content/sequences', `${screen}.json`);
   try {
     await fs.promises.writeFile(filePath, JSON.stringify(sequence, null, 2));
     return new Response('Saved', { status: 200 });
