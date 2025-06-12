@@ -9,10 +9,13 @@ import Calendar from './Calendar';
 import VerticalCarousel from './VerticalCarousel';
 import Marquee from './Marquee';
 import Mosaic from './Mosaic';
-import Paths from './Paths';
 // import Glass from './Glass';
 import PoseHouse from './PoseHouse';
 import Inform from './Inform';
+import ProjectsMode from './inform/ProjectsMode';
+import InformCalendar from './inform/Calendar';
+import InformProjects from './inform/ProjectsMode';
+import Grid from './Grid';
 
 // Utility function for proper array shuffling (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -29,7 +32,7 @@ interface ModeConfig {
   component: React.ComponentType<any>;
   name: string;
   duration: number; // Duration in milliseconds
-  mediaPath?: string; // Optional specific media path
+  mediaPath: string | undefined; // Always present, can be undefined
   props?: any; // Additional props for the mode
 }
 
@@ -63,7 +66,7 @@ const MODE_CONFIGS: ModeConfig[] = [
     component: Calendar,
     name: 'Calendar',
     duration: 5000, // 20 seconds
-    // Calendar doesn't need media
+    mediaPath: undefined, // Calendar doesn't need media
   },
   {
     component: Mosaic,
@@ -76,13 +79,37 @@ const MODE_CONFIGS: ModeConfig[] = [
     component: PoseHouse,
     name: 'Pose House',
     duration: 30000, // 30 seconds
-    // PoseHouse uses camera, no media needed
+    mediaPath: undefined, // PoseHouse uses camera, no media needed
   },
   {
     component: Inform,
     name: 'Inform',
     duration: 30000, // 30 seconds
-    // Inform doesn't need media
+    mediaPath: undefined, // Inform doesn't need media
+  },
+  {
+    component: ProjectsMode,
+    name: 'Projects',
+    duration: 30000, // 30 seconds
+    mediaPath: undefined, // ProjectsMode doesn't need media (uses API)
+  },
+  {
+    component: InformCalendar,
+    name: 'Inform Calendar',
+    duration: 30000, // 30 seconds
+    mediaPath: undefined, // No media needed
+  },
+  {
+    component: InformProjects,
+    name: 'Inform Projects',
+    duration: 30000, // 30 seconds
+    mediaPath: undefined, // No media needed
+  },
+  {
+    component: Grid,
+    name: 'Grid',
+    duration: 30000, // 30 seconds
+    mediaPath: 'linked-content/projects', // or whichever path you want for grid assets
   },
 ];
 
@@ -90,6 +117,18 @@ interface ModeManagerProps {
   autoRotate?: boolean;
   showControls?: boolean;
   sequence?: ModeSequenceItem[];
+}
+
+// Helper to preload a mode if it has a preload method
+async function preloadMode(modeConfig: ModeConfig | null | undefined, media: MediaItem[] = []) {
+  if (!modeConfig) return;
+  if (typeof (modeConfig.component as any).preload === 'function') {
+    try {
+      await (modeConfig.component as any).preload(media);
+    } catch (e) {
+      // Ignore preload errors
+    }
+  }
 }
 
 export default function ModeManager({
@@ -118,7 +157,7 @@ export default function ModeManager({
           mediaPath: item.mediaPath ?? base.mediaPath,
         };
       })
-      .filter((m): m is ModeConfig => m !== null);
+      .filter((m): m is ModeConfig => !!m);
   }, [sequence]);
 
   const currentMode = activeModes[currentModeIndex];
@@ -211,6 +250,15 @@ export default function ModeManager({
       if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
     };
   }, [currentModeIndex, currentMode?.duration, autoRotate, loading, currentMode, activeModes]);
+
+  // In ModeManager component, add this useEffect for preloading the next mode
+  useEffect(() => {
+    if (!autoRotate || loading || !currentMode || activeModes.length === 0) return;
+    const nextIndex = (currentModeIndex + 1) % activeModes.length;
+    const nextMode = activeModes[nextIndex] ?? null;
+    const nextMediaPath = nextMode?.mediaPath;
+    preloadMode(nextMode, nextMediaPath ? media[nextMediaPath] || [] : []); // Preload in background
+  }, [currentModeIndex, activeModes, autoRotate, loading, currentMode, media]);
 
   // Manual mode switching
   const switchToMode = (index: number) => {

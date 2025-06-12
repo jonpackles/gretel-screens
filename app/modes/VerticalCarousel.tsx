@@ -5,6 +5,7 @@ import Image from 'next/image';
 import MediaDisplay from '@/components/MediaDisplay';
 import { MediaItem } from '../types/media';
 import styles from './VerticalCarousel.module.scss';
+import modeStyles from './modes.module.scss';
 
 interface VerticalCarouselProps {
   media: MediaItem[];
@@ -32,7 +33,7 @@ export default function VerticalCarousel({ media }: VerticalCarouselProps) {
   }, [currentIndex, media.length]);
 
   return (
-    <div className={styles.carouselWrapper} ref={containerRef}>
+    <div className={`${modeStyles.modeContainer} ${styles.carouselWrapper}`} ref={containerRef}>
       <div
         className={styles.innerTrack}
         style={{

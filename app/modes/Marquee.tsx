@@ -1,96 +1,97 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { MediaItem } from '../types/media';
+import styles from './modes.module.scss';
 
-type Props = {
+type MarqueeProps = {
   media: MediaItem[];
 };
 
-const NUM_COLUMNS = 5;
-
-
-export default function Marquee({ media }: Props) {
-  const MAX_MEDIA_ITEMS = 60;
-  const limitedMedia = media.slice(0, MAX_MEDIA_ITEMS);
-  const wallRef = useRef<HTMLDivElement>(null);
-  const scrollOffsets = useRef<number[]>(Array(NUM_COLUMNS).fill(0));
-  const speeds = useRef<number[]>(
-    Array(NUM_COLUMNS)
-      .fill(0)
-      .map(() => 0.2 + Math.random() * 0.3)
-  );
-  const horizontal = useRef<number>(0);
+export default function Marquee({ media }: MarqueeProps) {
+  const [currentMedia, setCurrentMedia] = useState<MediaItem[]>([]);
 
   useEffect(() => {
-    let frame: number;
-    const animate = () => {
-      horizontal.current += 0.1;
-      if (wallRef.current) {
-        wallRef.current.style.transform = `translateX(-${horizontal.current}px)`;
-      }
+    if (media.length > 0) {
+      // Randomize and take up to 6 items
+      const shuffled = [...media].sort(() => Math.random() - 0.5);
+      setCurrentMedia(shuffled.slice(0, 6));
+    }
+  }, [media]);
 
-      scrollOffsets.current.forEach((offset, colIndex) => {
-        const col = wallRef.current?.children[colIndex] as HTMLElement;
-        if (col) {
-          scrollOffsets.current[colIndex] += speeds.current[colIndex];
-          col.style.transform = `translateY(-${scrollOffsets.current[colIndex]}px)`;
-        }
-      });
+  const renderMediaItem = (item: MediaItem, index: number) => {
+    const isVideo = /\.(mp4|webm|ogg)$/i.test(item.name);
+    const src = `/content/${item.path}`;
 
-      frame = requestAnimationFrame(animate);
-    };
-    animate();
-    return () => cancelAnimationFrame(frame);
-  }, []);
+    const commonClasses = "object-cover h-full";
 
-  // distribute media into columns
-  const columns = Array.from({ length: NUM_COLUMNS }, () => [] as MediaItem[]);
-limitedMedia.forEach((item, i) => {
-  columns[i % NUM_COLUMNS].push(item);
-});
+    if (isVideo) {
+      return (
+        <video
+          key={`${item.path}-${index}`}
+          className={commonClasses}
+          autoPlay
+          muted
+          loop
+          playsInline
+        >
+          <source src={src} type="video/mp4" />
+        </video>
+      );
+    }
+
+    return (
+      <img
+        key={`${item.path}-${index}`}
+        src={src}
+        alt={item.name}
+        className={commonClasses}
+      />
+    );
+  };
+
+  if (!currentMedia.length) {
+    return (
+      <div className={`${styles.modeContainer} flex items-center justify-center`}>
+        <div className="text-white text-2xl">Loading media...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="overflow-hidden w-full h-screen relative bg-black">
-      <div
-        ref={wallRef}
-        className="absolute flex gap-6 h-full will-change-transform"
-        style={{ padding: '0 0vw' }} // pre-offset to avoid empty space early
-      >
-        {columns.map((column, colIndex) => (
-          <div
-            key={colIndex}
-            className="flex flex-col gap-4 will-change-transform"
-            style={{ minWidth: '240px' }}
+    <div className={`${styles.modeContainer} bg-black`}>
+      {/* Scrolling marquee */}
+      <div className="flex animate-scroll h-full">
+        {/* Duplicate items for seamless loop */}
+        {[...currentMedia, ...currentMedia, ...currentMedia].map((item, index) => (
+          <div 
+            key={index}
+            className="flex-shrink-0 h-full"
+            style={{ 
+              width: 'auto',
+              aspectRatio: '16/9',
+              minWidth: '300px'
+            }}
           >
-            {/* Double the content for seamless loop */}
-            {[...column, ...column].map((item, i) => (
-              <div key={i} className="relative w-full aspect-[4/5] bg-gray-900 overflow-hidden">
-                {item.name.endsWith('.mp4') ? (
-                  <video
-                    src={`/content/${item.path}`}
-                    className="w-full h-full object-cover"
-                    muted
-                    loop
-                    autoPlay
-                    playsInline
-                  />
-                ) : (
-                  <Image
-                    unoptimized
-                    src={`/content/${item.path}`}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                    sizes="240px"
-                  />
-                )}
-              </div>
-            ))}
+            {renderMediaItem(item, index)}
           </div>
         ))}
       </div>
+
+      <style jsx>{`
+        @keyframes scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-33.333%);
+          }
+        }
+        
+        .animate-scroll {
+          animation: scroll 30s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }

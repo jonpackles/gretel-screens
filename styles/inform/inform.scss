@@ -17,6 +17,11 @@
   --h2-list: clamp(32px, 2.5vw, 72px);
   --h3-list: clamp(24px, 2vw, 48px);
 
+  --tag-size: clamp(16px, 1vw, 3vw);
+
+  --info-size-poster: clamp(28px, 2vw, 6vw);
+  --info-size-list: clamp(20px, 2vw, 5vw);
+
   --big-date: clamp(40px, 4vw, 6vw);
   
 
@@ -28,19 +33,16 @@
 
   color: white;
   line-height: 1.2;
+  overflow: scroll;
 
   
 }
 
 
 .block-wrapper {
-  
   transition: all 0.3s ease;
   position: relative;
-//   margin-bottom: 24px;
   cursor: pointer;
-
- 
 
   .tag {
     width: fit-content;
@@ -48,11 +50,12 @@
     border: 2px solid #fff;
     border-radius: 100px;
     font-family: var(--droulers);
+    font-size: var(--tag-size);
     text-transform: uppercase;
   }
 
   &--list {
-    margin: 24px;
+    padding: 24px;
 
     & > * {
       border-top: 2px solid #fff;
@@ -76,6 +79,7 @@
       font-size: var(--h3-list);
     }
 
+
     .date {
       font-family: var(--quadrant);
       font-size: var(--big-date);
@@ -90,6 +94,7 @@
 
     .info {
       display: flex;
+      font-size: var(--info-size-list);
     //   justify-content: space-between;
       
 
@@ -129,6 +134,11 @@
       font-size: var(--h3-poster);
     }
 
+    p {
+        font-size: var(--info-size-poster);
+    }
+
+
     p, h3 {
         border-top: 2px solid #fff;
         padding-top: 8px;  
@@ -137,7 +147,7 @@
     .info {
       border-top: 2px solid #fff;
       padding-top: 8px;
-      font-size: 24px;
+      font-size: var(--info-size-poster);
     }
 
     .info > * {
@@ -153,9 +163,10 @@
   &--internal {
     background-color: #fff;
     color: #000;
+    font-family: var(--droulers);
 
     h1 {
-      font-family: var(--droulers);
+    //   font-family: var(--droulers);
     }
 
     .tag {
@@ -204,13 +215,11 @@
 }
 
 .gretel-logo {
-  height: 24px;
-  
-  .block-wrapper--poster & {
-    height: 32px;
-  }
+  height: 1em;
+  width: auto;
+  vertical-align: middle;
 }
 
 .hidden {
-    display: none;
+    // display: none;
 }

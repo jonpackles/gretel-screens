@@ -8,7 +8,8 @@ export const getInformContent = async (): Promise<ContentBlock[]> => {
       data: {
         title: "Paloma's Birthday!",
         body: "Join us at 3pm in the kitchen for cake and embarrassing stories.",
-        date: "2025-06-12"
+        date: "2025-06-12",
+        tag: "Announcement"
       },
       internal: true
     },
@@ -20,7 +21,8 @@ export const getInformContent = async (): Promise<ContentBlock[]> => {
         date: "2025-06-14",
         time: "7:00–8:30 AM",
         location: "@ Buck NY",
-        description: "Monthly gathering of creative professionals."
+        description: "Monthly gathering of creative professionals.",
+        tag: "Event"
       },
       internal: false
     },
@@ -41,7 +43,8 @@ export const getInformContent = async (): Promise<ContentBlock[]> => {
       data: {
         title: "Office Closed: Independence Day",
         body: "The studio will be closed on Thursday, July 4.",
-        date: "2025-07-04"
+        date: "2025-07-04",
+        tag: "Announcement"
       },
       internal: true
     },
@@ -64,7 +67,8 @@ export const getInformContent = async (): Promise<ContentBlock[]> => {
         date: "2025-06-28",
         time: "4:00–6:00 PM",
         location: "Gretel",
-        description: "Bring something weird or beautiful to share."
+        description: "Bring something weird or beautiful to share.",
+        tag: "Event"
       },
       internal: true
     }

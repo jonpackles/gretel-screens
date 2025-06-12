@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef } from "react";
-import AnnouncementBlock from "./blocks/AnnouncementBlock";
 import EventBlock from "./blocks/EventBlock";
 import ProjectBlock from "./blocks/ProjectBlock";
 
@@ -41,7 +40,6 @@ export default function Block({ type, data, internal }: Props) {
   const renderContent = () => {
     switch (type) {
       case "announcement":
-        return <AnnouncementBlock data={data} mode={mode} formatDate={formatDate} />;
       case "event":
         return <EventBlock data={data} mode={mode} formatDate={formatDate} />;
       case "project":

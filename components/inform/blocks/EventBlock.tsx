@@ -3,10 +3,11 @@ import GretelLogo from '../GretelLogo';
 type Props = {
   data: {
     title: string;
-    date: string;
+    date?: string;        // Made optional for announcements
     time?: string;
     location?: string;
     description?: string;
+    body?: string;        // For announcement body text
     imageUrl?: string;
     tag?: string;
   };
@@ -15,9 +16,12 @@ type Props = {
 };
 
 export default function EventBlock({ data, mode, formatDate }: Props) {
+  // Use body for announcements, description for events, or either for display
+  const displayText = data.body || data.description;
+  
   return mode === "list" ? (
     <div>
-      <div className="date">{formatDate(data.date)}</div>
+      <div className="date">{data.date && formatDate(data.date)}</div>
       <div className="body">
         <h1 className="title">{data.title}</h1>
         <div className="info">
@@ -42,14 +46,14 @@ export default function EventBlock({ data, mode, formatDate }: Props) {
       </div>
       
       <div className="info">
-        <div className="date">{new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+        {data.date && <div className="date">{new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>}
         {data.time && <div className="time">{data.time}</div>}
         {data.location && (
           
             <GretelLogo location={data.location} />
           
         )}
-        {data.description && <div className="body">{data.description?.replace(/\n/g, '<br>')}</div>}
+        {displayText && <div className="body">{displayText.replace(/\n/g, '<br>')}</div>}
       </div>
     </div>
   );

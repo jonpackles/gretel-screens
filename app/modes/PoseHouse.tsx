@@ -1,25 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
-import { usePoseDetection } from '../hooks/usePoseDetection';
+import { usePoseDetection } from '@/app/hooks/usePoseDetection';
+import styles from './modes.module.scss';
 
-interface PoseHouseProps {
-  // No media needed - uses camera and SVG
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface HousePoint extends Point {
+type Point = { x: number; y: number };
+type HousePoint = Point & { 
   targetX: number;
   targetY: number;
   originalX: number;
   originalY: number;
-  lastSeen?: number;
-}
+  lastSeen?: number; 
+};
+
+type PoseHouseProps = {
+  // No props needed for this mode
+};
 
 export default function PoseHouse({}: PoseHouseProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -154,18 +151,18 @@ export default function PoseHouse({}: PoseHouseProps) {
       if (!currentResult || !appRef.current) return;
 
       const now = Date.now();
-
+          
       if (currentResult.isFullBodyDetected && currentResult.landmarks) {
         const landmarks = currentResult.landmarks;
 
-        housePointsRef.current.forEach((housePoint, index) => {
+              housePointsRef.current.forEach((housePoint, index) => {
           const poseIndex = poseMappings[index];
           const landmark = poseIndex !== undefined ? landmarks[poseIndex] : null;
 
-          if (landmark && landmark.visibility > 0.6) {
-            const screenX = (1 - landmark.x) * appRef.current!.screen.width;
-            const screenY = landmark.y * appRef.current!.screen.height;
-
+                  if (landmark && landmark.visibility > 0.6) {
+                    const screenX = (1 - landmark.x) * appRef.current!.screen.width;
+                    const screenY = landmark.y * appRef.current!.screen.height;
+                    
             const padding = 50;
             housePoint.targetX = Math.max(padding, Math.min(appRef.current!.screen.width - padding, screenX));
             housePoint.targetY = Math.max(padding, Math.min(appRef.current!.screen.height - padding, screenY));
@@ -177,14 +174,14 @@ export default function PoseHouse({}: PoseHouseProps) {
             // Landmark not seen recently; revert to original
             housePoint.targetX = housePoint.originalX;
             housePoint.targetY = housePoint.originalY;
-          }
-        });
-      } else {
+                }
+              });
+            } else {
         // No pose detected; revert all to original
-        housePointsRef.current.forEach(housePoint => {
-          housePoint.targetX = housePoint.originalX;
-          housePoint.targetY = housePoint.originalY;
-        });
+            housePointsRef.current.forEach(housePoint => {
+              housePoint.targetX = housePoint.originalX;
+              housePoint.targetY = housePoint.originalY;
+            });
       }
     };
 
@@ -234,13 +231,8 @@ export default function PoseHouse({}: PoseHouseProps) {
 
   return (
     <div 
-      style={{ 
-        width: '100vw', 
-        height: '100vh',
-        overflow: 'hidden',
-        position: 'relative',
-        cursor: 'none'
-      }}
+      className={styles.modeContainer}
+      style={{ cursor: 'none' }}
       onClick={enterFullscreen}
     >
       {/* Camera preview - separate from PIXI container */}
