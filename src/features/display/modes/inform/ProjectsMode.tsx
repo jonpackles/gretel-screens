@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { basel, quadrant, droulers } from '@/styles/fonts';
-import ProjectBlock from '@/components/inform/blocks/ProjectBlock';
+import ProjectBlock from '@/shared/components/inform/blocks/ProjectBlock';
 import styles from '../modes.module.scss';
 import '@/styles/inform/inform.scss';
 

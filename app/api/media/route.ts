@@ -9,6 +9,7 @@ import {
   isVideo, 
   getMimeType 
 } from '@/shared/utils/mediaMetadata';
+import { loadVisibilityDb } from '@/shared/utils/visibilityDb';
 
 const BASE_PATH = path.join(process.cwd(), 'public/content');
 const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm', '.ogg'];
@@ -20,7 +21,12 @@ const DIRECTORY_CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 /**
  * Check if file should be included based on filters
  */
-function matchesFilters(item: MediaItem, options: MediaQueryOptions): boolean {
+function matchesFilters(item: MediaItem, options: MediaQueryOptions, includeHidden = false): boolean {
+  // Visibility filter - exclude hidden files unless includeHidden is true
+  if (!includeHidden && item.visibility === 'hidden') {
+    return false;
+  }
+  
   // File type filter
   if (options.fileType && options.fileType !== 'all') {
     const isImageFile = isImage(item.name);
@@ -90,65 +96,52 @@ function sortItems(items: MediaItem[], sortBy: string = 'name', sortOrder: strin
 }
 
 /**
- * Process a single file and extract metadata
+ * Process a single file and return MediaItem with metadata
  */
-async function processFile(
-  absolutePath: string, 
-  relativePath: string, 
-  stat: fs.Stats
-): Promise<MediaItem> {
-  const name = path.basename(relativePath);
+async function processFile(absolutePath: string, relativePath: string, stat: fs.Stats): Promise<MediaItem> {
+  const name = path.basename(absolutePath);
+  const ext = path.extname(name).toLowerCase();
   
-  // Extract project name from the correct level in the path structure
-  // For paths like: linked-content/projects/[projectname]/motion/file.jpg
-  // We want to extract [projectname], not "linked-content"
-  const projectPathParts = relativePath.split('/');
-  const project = projectPathParts.length >= 3 && projectPathParts[1] === 'projects' ? projectPathParts[2] : projectPathParts[0];
-  
-  // Extract metadata (this now handles caching internally)
-  let metadata;
-  try {
-    metadata = await extractMetadata(absolutePath);
-  } catch (error) {
-    console.warn(`Failed to extract metadata for ${absolutePath}:`, error);
-    // Fallback to basic metadata
-    metadata = {
-      fileSize: stat.size,
-      mimeType: getMimeType(name),
-      contentHash: '',
-      etag: `"${stat.size}-${stat.mtime.getTime()}"`,
-      createdAt: stat.birthtime.toISOString(),
-    };
-  }
-  
-  // Derive category from directory structure
+  // Extract project from path
   const pathParts = relativePath.split('/');
-  const category = pathParts.length > 1 ? pathParts[1] : 'uncategorized';
-  
-  // Generate simple tags from filename and path
-  const tags = [
-    ...pathParts.slice(0, -1), // directory names as tags
-    path.extname(name).slice(1).toLowerCase(), // file extension as tag
-    isImage(name) ? 'image' : isVideo(name) ? 'video' : 'other'
-  ].filter(Boolean);
-  
-  return {
+  const projectIndex = pathParts.indexOf('projects');
+  const project = projectIndex !== -1 && projectIndex + 1 < pathParts.length 
+    ? pathParts[projectIndex + 1] 
+    : undefined;
+
+  // Create base MediaItem (without visibility - that's added later)
+  const mediaItem: MediaItem = {
     name,
-    type: 'file',
-    path: relativePath.replace(/\\/g, '/'),
+    type: 'file' as const,
+    path: relativePath,
     project,
     lastModified: stat.mtime.toISOString(),
-    fileSize: metadata.fileSize,
-    mimeType: metadata.mimeType,
-    dimensions: metadata.dimensions,
-    duration: metadata.duration,
-    etag: metadata.etag,
-    contentHash: metadata.contentHash,
-    createdAt: metadata.createdAt,
-    category,
-    tags,
-    processed: true,
+    fileSize: stat.size,
+    mimeType: getMimeType(ext),
   };
+
+  // Extract additional metadata
+  try {
+    const metadata = await extractMetadata(absolutePath);
+    Object.assign(mediaItem, metadata);
+  } catch (error) {
+    console.error(`Error extracting metadata for ${absolutePath}:`, error);
+    mediaItem.processingError = error instanceof Error ? error.message : 'Unknown error';
+  }
+
+  return mediaItem;
+}
+
+/**
+ * Merge visibility data with media items at response time
+ */
+function mergeVisibilityData(items: MediaItem[]): MediaItem[] {
+  const visibilityDb = loadVisibilityDb();
+  
+  return items.map(item => ({
+    ...item,
+    visibility: visibilityDb[item.path] || 'visible'
+  }));
 }
 
 /**
@@ -171,14 +164,34 @@ async function getEnhancedDirectoryContents(
     const relativePath = path.join(relativeBase, entry.name);
     const stat = fs.statSync(absolutePath);
 
-    if (entry.isDirectory() && recursive) {
-      // Recursively process subdirectories
-      const children = await getEnhancedDirectoryContents(absolutePath, relativePath, true);
-      results.push(...children);
+    if (entry.isDirectory()) {
+      if (recursive) {
+        // Recursively process subdirectories
+        const children = await getEnhancedDirectoryContents(absolutePath, relativePath, true);
+        results.push(...children);
+      } else {
+        // Add directory as an item (for project listing)
+        const name = path.basename(relativePath);
+        const projectPathParts = relativePath.split('/');
+        const project = projectPathParts.length >= 3 && projectPathParts[1] === 'projects' ? projectPathParts[2] : projectPathParts[0];
+        
+        results.push({
+          name,
+          type: 'directory',
+          path: relativePath.replace(/\\/g, '/'),
+          project,
+          lastModified: stat.mtime.toISOString(),
+          fileSize: 0,
+          createdAt: stat.birthtime.toISOString(),
+          category: 'directory',
+          tags: ['directory'],
+          processed: true,
+        });
+      }
     } else if (entry.isFile()) {
-      // Only process supported media files
+      // Only process supported media files (now including previously hidden ones)
       const ext = path.extname(entry.name).toLowerCase();
-      if (SUPPORTED_EXTENSIONS.includes(ext) && !entry.name.startsWith('_hide_')) {
+      if (SUPPORTED_EXTENSIONS.includes(ext)) {
         try {
           const mediaItem = await processFile(absolutePath, relativePath, stat);
           results.push(mediaItem);
@@ -195,12 +208,22 @@ async function getEnhancedDirectoryContents(
 /**
  * Generate cache key for directory listing
  */
-function generateCacheKey(options: MediaQueryOptions): string {
+function generateCacheKey(options: MediaQueryOptions, includeHidden: boolean): string {
+  // Include visibility database hash in cache key
+  const visibilityDb = loadVisibilityDb();
+  const visibilityHash = require('crypto')
+    .createHash('md5')
+    .update(JSON.stringify(visibilityDb))
+    .digest('hex')
+    .substring(0, 8);
+    
   return JSON.stringify({
     path: options.path || '',
     recursive: options.recursive || false,
     fileType: options.fileType || 'all',
     limit: options.limit || 50,
+    includeHidden,
+    visibilityHash,
   });
 }
 
@@ -238,6 +261,8 @@ export async function GET(req: NextRequest) {
     limit: parseInt(searchParams.get('limit') || '50'),
   };
 
+  const includeHidden = searchParams.get('includeHidden') === 'true';
+
   const fullPath = path.join(BASE_PATH, options.path || '');
 
   try {
@@ -252,7 +277,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check directory cache first
-    const cacheKey = generateCacheKey(options);
+    const cacheKey = generateCacheKey(options, includeHidden);
     const cached = directoryCache.get(cacheKey);
     const now = Date.now();
     
@@ -306,8 +331,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Apply filters
-    const filteredItems = items.filter(item => matchesFilters(item, options));
+    // Merge visibility data first
+    const itemsWithVisibility = mergeVisibilityData(items);
+
+    // Apply filters (including visibility filtering)
+    const filteredItems = itemsWithVisibility.filter(item => matchesFilters(item, options, includeHidden));
     
     // Apply sorting
     const sortedItems = sortItems(filteredItems, options.sortBy, options.sortOrder);

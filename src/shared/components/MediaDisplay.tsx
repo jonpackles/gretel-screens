@@ -1,67 +1,52 @@
 'use client';
 
-import React from 'react';
 import Image from 'next/image';
-import LazyVideo from './LazyVideo';
 import { MediaItem } from '../types/media';
 
 interface MediaDisplayProps {
   item: MediaItem;
-  width?: number;
-  height?: number;
   className?: string;
-  style?: React.CSSProperties;
-  priority?: boolean;
-  lazyVideo?: boolean;
+  containerClassName?: string;
+  fill?: boolean;
 }
 
 export default function MediaDisplay({
   item,
-  width = 400,
-  height = 400,
   className = '',
-  style = {},
-  priority = false,
-  lazyVideo = true,
+  containerClassName = '',
+  fill = false
 }: MediaDisplayProps) {
-  const isVideo = /\.(mp4|webm|ogg)$/i.test(item.name);
-  const src = `/content/${item.path}`;
+  const isVideo = item.name.match(/\.(mp4)$/i);
 
   if (isVideo) {
-    if (lazyVideo) {
-      return (
-        <div style={{ ...style, width, height }}>
-          <LazyVideo
-            src={src}
-            className={className}
-          />
-        </div>
-      );
-    } else {
-      return (
-        <video
-          src={src}
-          className={className}
-          style={{ ...style, width, height }}
-          autoPlay
-          loop
-          muted
-          playsInline
-        />
-      );
-    }
+    return (
+      <video
+        src={`/content/${item.path}`}
+        className={className}
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    );
   }
 
-  return (
+  return fill ? (
+    <div className={`relative ${containerClassName}`}>
+      <Image
+        src={`/content/${item.path}`}
+        alt={item.name}
+        fill
+        className={className}
+      />
+    </div>
+  ) : (
     <Image
-      src={src}
+      src={`/content/${item.path}`}
       alt={item.name}
-      width={width}
-      height={height}
+      width={item.width}
+      height={item.height}
       className={className}
-      style={style}
-      priority={priority}
-      unoptimized
     />
   );
 }

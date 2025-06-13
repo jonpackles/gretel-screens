@@ -1,7 +1,7 @@
 export type MediaItem = {
   // Basic file information
   name: string;
-  type: 'file';
+  type: 'file' | 'directory';
   path: string;
   project?: string;
   lastModified?: string;
@@ -31,6 +31,9 @@ export type MediaItem = {
   // Processing status
   processed?: boolean; // Whether metadata extraction is complete
   processingError?: string; // If metadata extraction failed
+  
+  // Visibility control (Option B)
+  visibility?: 'visible' | 'hidden'; // Replaces filename-based hiding
 };
 
 // API response types

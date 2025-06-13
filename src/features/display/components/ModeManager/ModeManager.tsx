@@ -15,6 +15,10 @@ import Inform from '../../modes/Inform';
 import Grid from '../../modes/Grid';
 import Paths from '../../modes/Paths';
 
+// Import inform sub-modes
+import InformCalendar from '../../modes/inform/Calendar';
+import InformProjects from '../../modes/inform/ProjectsMode';
+
 // Utility function for proper array shuffling (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
   const shuffled = [...array];
@@ -96,6 +100,19 @@ const MODE_CONFIGS: ModeConfig[] = [
     name: 'Paths',
     duration: 30000, // 30 seconds
     mediaPath: 'linked-content/projects',
+  },
+  // Add inform sub-modes
+  {
+    component: InformCalendar,
+    name: 'Inform Calendar',
+    duration: 30000, // 30 seconds
+    mediaPath: undefined, // Inform Calendar doesn't need media
+  },
+  {
+    component: InformProjects,
+    name: 'Inform Projects',
+    duration: 30000, // 30 seconds
+    mediaPath: undefined, // Inform Projects doesn't need media
   },
 ];
 
@@ -186,8 +203,7 @@ export default function ModeManager({
             
             const files = (data.items?.filter((item: MediaItem) =>
               item.type === 'file' && 
-              /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name) &&
-              !item.name.startsWith('_hide_')
+              /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name)
             ) || []);
 
             console.log(`ModeManager: Found ${files.length} files in ${path}`);

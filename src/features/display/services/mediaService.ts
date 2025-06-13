@@ -1,5 +1,5 @@
 import { MediaItem, MediaApiResponse, MediaQueryOptions } from '@/shared/types/media';
-import { shuffleArray } from '@/shared/utils/shuffle';
+import { shuffleMedia } from '@/shared/utils/shuffle';
 
 export class MediaService {
   private static cache: { [path: string]: { data: MediaApiResponse; timestamp: number } } = {};
@@ -137,7 +137,7 @@ export class MediaService {
       const fetchPromises = uniquePaths.map(async (path) => {
         const files = await this.fetchMedia(path);
         // Shuffle the media once when fetched for compatibility with existing modes
-        return { path, files: shuffleArray(files) };
+        return { path, files: shuffleMedia(files) };
       });
 
       const results = await Promise.all(fetchPromises);

@@ -1,11 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import VerticalCarousel from '../../modes/VerticalCarousel';
-import { MediaItem } from '../../types/media';
-import ModeManager, { ModeSequenceItem } from '../../modes/ModeManager';
-import { fetchSequence } from '../../../lib/fetchSequence';
-
+import { ModeManager, ModeSequenceItem } from '@/features/display';
 
 export default function ScreenA() {
   const [sequence, setSequence] = useState<ModeSequenceItem[] | null>(null);
