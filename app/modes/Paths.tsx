@@ -1,409 +1,201 @@
-'use client';
+"use client";
 
-import { useEffect, useCallback, useRef, useState } from 'react';
-import * as PIXI from 'pixi.js';
-import { MediaItem } from '../types/media';
+import { useEffect, useRef, useState } from "react";
+import { MediaItem } from "../types/media";
 
-interface PathsProps {
-  media: MediaItem[];
+const SHAPES = ["house", "sine", "infinity", "circle"] as const;
+type ShapeName = typeof SHAPES[number];
+const STEP_MS = 100; // Speed of animation (ms per step)
+const PAUSE_MS = 3000; // Pause at end of shape (ms)
+const VIDEO_SIZE = 300;
+const VIDEO_SPACING = 100;
+
+function getShapePath(shape: ShapeName, count: number): { x: number; y: number }[] {
+  switch (shape) {
+    case "house":
+      return [
+        { x: 0.35, y: 0.7 },
+        { x: 0.35, y: 0.4 },
+        { x: 0.5, y: 0.2 },
+        { x: 0.65, y: 0.4 },
+        { x: 0.65, y: 0.7 },
+        { x: 0.35, y: 0.7 },
+      ];
+    case "sine":
+      return Array.from({ length: count }, (_, i) => {
+        const t = i / (count - 1);
+        return {
+          x: t,
+          y: 0.5 + 0.2 * Math.sin(2 * Math.PI * t),
+        };
+      });
+    case "infinity":
+      return Array.from({ length: count }, (_, i) => {
+        const t = (i / (count - 1)) * 2 * Math.PI;
+        return {
+          x: 0.5 + 0.25 * Math.sin(t),
+          y: 0.5 + 0.25 * Math.sin(t) * Math.cos(t),
+        };
+      });
+    case "circle":
+      return Array.from({ length: count }, (_, i) => {
+        const t = (i / (count - 1)) * 2 * Math.PI;
+        return {
+          x: 0.5 + 0.3 * Math.cos(t),
+          y: 0.5 + 0.3 * Math.sin(t),
+        };
+      });
+    default:
+      return [];
+  }
 }
 
-// Constants
-const PATHS_CONSTANTS = {
-  FRAMES_PER_IMAGE_SPAWN: 4,
-  PAUSE_DURATION_FRAMES: 180,
-  MAX_BOUNDING_BOX_SIZE: 150,
-  NUM_PATH_POINTS: 50
-};
-
-// House shape path generator
-const createHouseShapePath = (pWidth: number, pHeight: number, pathResolution: number) => {
-  const newPath: { x: number; y: number }[] = [];
-  const housePoints = [
-    { x: 0.35, y: 0.55 }, { x: 0.35, y: 0.35 }, { x: 0.5, y: 0.15 },
-    { x: 0.65, y: 0.35 }, { x: 0.65, y: 0.55 }, { x: 0.35, y: 0.55 }
-  ];
-  
-  // Use the smaller dimension to keep house proportions
-  const minDimension = Math.min(pWidth, pHeight);
-  const houseSize = minDimension; // Use 60% of the smaller dimension
-  
-  // Center the house on screen
-  const offsetX = (pWidth - houseSize) / 2;
-  const offsetY = (pHeight - houseSize) / 2;
-  
-  for (let i = 0; i < pathResolution; i++) {
-    const t = i / (pathResolution - 1);
-    const numSegments = housePoints.length - 1;
-    const segmentIndex = Math.min(Math.floor(t * numSegments), numSegments - 1);
-    const segmentT = (t * numSegments) % 1;
-    
-    const p1 = housePoints[segmentIndex];
-    const p2 = housePoints[segmentIndex + 1] || housePoints[segmentIndex];
-    
-    // Apply to square area and center on screen
-    const x = offsetX + houseSize * (p1.x + (p2.x - p1.x) * segmentT);
-    const y = offsetY + houseSize * (p1.y + (p2.y - p1.y) * segmentT);
-    newPath.push({ x, y });
+function getEvenlySpacedPoints(path: { x: number; y: number }[], spacingPx: number, width: number, height: number) {
+  if (path.length < 2) return [];
+  const pts = path.map((p) => ({ x: p.x * width, y: p.y * height }));
+  const segLens = pts.slice(1).map((p, i) => Math.hypot(p.x - pts[i].x, p.y - pts[i].y));
+  const totalLen = segLens.reduce((a, b) => a + b, 0);
+  const n = Math.max(2, Math.floor(totalLen / spacingPx));
+  const result = [];
+  let dist = 0, segIdx = 0;
+  for (let i = 0; i < n; i++) {
+    const targetDist = (i / (n - 1)) * totalLen;
+    while (dist + segLens[segIdx] < targetDist && segIdx < segLens.length - 1) {
+      dist += segLens[segIdx];
+      segIdx++;
+    }
+    const segStart = pts[segIdx];
+    const segEnd = pts[segIdx + 1];
+    const segT = (targetDist - dist) / segLens[segIdx];
+    result.push({
+      x: segStart.x + (segEnd.x - segStart.x) * segT,
+      y: segStart.y + (segEnd.y - segStart.y) * segT,
+    });
   }
-  return newPath;
-};
+  return result;
+}
 
-// Sprite utilities
-const createSprite = (texture: PIXI.Texture, maxWidth: number, maxHeight: number): PIXI.Sprite | null => {
-  if (!texture || !texture.source || texture.width <= 0 || texture.height <= 0) return null;
-  
-  const sprite = new PIXI.Sprite(texture);
-  const originalAspect = texture.width / texture.height;
-  let newWidth, newHeight;
-
-  if (originalAspect > 1) {
-    newWidth = maxWidth;
-    newHeight = newWidth / originalAspect;
-  } else {
-    newHeight = maxHeight;
-    newWidth = newHeight * originalAspect;
-  }
-
-  sprite.width = Math.max(1, newWidth);
-  sprite.height = Math.max(1, newHeight);
-  return sprite;
-};
-
-const playVideoIfNeeded = (texture: PIXI.Texture): void => {
-  if (texture.source?.resource?.tagName === 'VIDEO') {
-    const videoElement = texture.source.resource as HTMLVideoElement;
-    videoElement.muted = true;
-    videoElement.loop = true;
-    videoElement.currentTime = Math.random() * (videoElement.duration || 0);
-    videoElement.play().catch(e => console.warn('Video play warning:', e));
-  }
-};
-
-export default function Paths({ media }: PathsProps) {
+export default function Paths({ media }: { media: MediaItem[] }) {
+  const [shapeIdx, setShapeIdx] = useState(0);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const appRef = useRef<PIXI.Application | null>(null);
-  const pathPointsRef = useRef<{ x: number; y: number }[]>([]);
-  const [texturesReady, setTexturesReady] = useState(false);
-  
-  // Animation state refs
-  const framesSinceSpawnRef = useRef(0);
-  const currentTextureIndexRef = useRef(0);
-  const displayedStaticSpritesOnPathRef = useRef<PIXI.Sprite[]>([]);
-  const pauseCounterRef = useRef(0);
-  const shuffledTexturesRef = useRef<PIXI.Texture[]>([]);
-  const spawnFrameScheduleRef = useRef<number[]>([]);
-  const texturesRef = useRef<PIXI.Texture[]>([]);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const computeEasedSpawnFrames = (numImages: number, totalFrames: number) => {
-    // Linear timing: uniform intervals
-    const frames: number[] = [];
-    for (let i = 0; i < numImages; i++) {
-      const t = i / (numImages - 1);
-      const linearT = t;
-      frames.push(Math.round(linearT * totalFrames));
-    }
-    return frames;
-  };
-
-  const updateGeneratedPath = useCallback(() => {
-    console.log('Paths: updateGeneratedPath called');
-    
-    if (!appRef.current || !appRef.current.renderer || texturesRef.current.length === 0) {
-      console.log('Paths: updateGeneratedPath blocked -', {
-        hasApp: !!appRef.current,
-        hasRenderer: !!appRef.current?.renderer,
-        texturesLength: texturesRef.current.length
-      });
-      pathPointsRef.current = [];
-      return;
-    }
-
-    const screenWidth = appRef.current.renderer.width;
-    const screenHeight = appRef.current.renderer.height;
-
-    console.log('Paths: Screen dimensions -', { screenWidth, screenHeight });
-
-    if (!screenWidth || !screenHeight) {
-      console.warn('Paths: Invalid screen dimensions');
-      return;
-    }
-
-    // Generate house shape path
-    console.log('Paths: Generating house path with', PATHS_CONSTANTS.NUM_PATH_POINTS, 'points');
-    const newPath = createHouseShapePath(screenWidth, screenHeight, PATHS_CONSTANTS.NUM_PATH_POINTS);
-    console.log('Paths: Generated path with', newPath.length, 'points. First few:', newPath.slice(0, 3));
-    pathPointsRef.current = newPath;
-
-    // Reset animation state
-    framesSinceSpawnRef.current = 0;
-    currentTextureIndexRef.current = 0;
-    pauseCounterRef.current = 0;
-    shuffledTexturesRef.current = [...texturesRef.current].sort(() => Math.random() - 0.5);
-
-    // Compute eased spawn schedule
-    const totalImages = texturesRef.current.length;
-    const totalEasedFrames = PATHS_CONSTANTS.FRAMES_PER_IMAGE_SPAWN * (totalImages - 1);
-    const schedule = computeEasedSpawnFrames(totalImages, totalEasedFrames);
-    spawnFrameScheduleRef.current = schedule;
-    
-    console.log('Paths: Spawn schedule created -', {
-      totalImages,
-      totalEasedFrames,
-      firstFewFrames: schedule.slice(0, 5)
-    });
-
-    // Clear existing sprites
-    displayedStaticSpritesOnPathRef.current.forEach(sprite => {
-      if (sprite.parent) {
-        sprite.parent.removeChild(sprite);
+  // Track container size
+  useEffect(() => {
+    function update() {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight,
+        });
       }
-      sprite.destroy();
-    });
-    displayedStaticSpritesOnPathRef.current = [];
-    
-    console.log('Paths: updateGeneratedPath complete. Path length:', pathPointsRef.current.length);
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Update path when textures are ready
-  useEffect(() => {
-    if (texturesReady && texturesRef.current.length > 0 && appRef.current) {
-      console.log('Paths: useEffect triggering updateGeneratedPath due to texturesReady');
-      updateGeneratedPath();
-    }
-  }, [texturesReady, updateGeneratedPath]);
+  // Get path points for current shape
+  const basePath = getShapePath(SHAPES[shapeIdx], 100);
+  const points = getEvenlySpacedPoints(basePath, VIDEO_SPACING, containerSize.width, containerSize.height);
+  const videoMedia = media.filter((m) => /\.mp4$/i.test(m.name));
+  // Use as many videos as needed, looping if not enough
+  const usedVideos = Array.from({ length: points.length }, (_, i) => videoMedia[i % videoMedia.length]);
 
-  // Load textures
-  const loadTextures = useCallback(async () => {
-    if (!media.length) return;
-    
-    console.log('Paths: loadTextures starting for', media.length, 'items');
-    setTexturesReady(false);
-    const textures: PIXI.Texture[] = [];
-    
-    for (const mediaItem of media) {
-      try {
-        let texture: PIXI.Texture;
-        
-        if (mediaItem.name.match(/\.(mp4)$/i)) {
-          const video = document.createElement('video');
-          video.src = `/content/${mediaItem.path}`;
-          video.muted = true;
-          video.loop = true;
-          video.autoplay = true;
-          video.playsInline = true;
-          
-          await new Promise(resolve => {
-            video.onloadeddata = () => resolve(true);
-            video.onerror = () => resolve(false);
-          });
-          
-          texture = PIXI.Texture.from(video);
+  // Animation logic
+  useEffect(() => {
+    if (points.length === 0 || usedVideos.length === 0) return;
+    if (isPaused) return;
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setCurrentIdx((idx) => {
+        if (idx < points.length) {
+          return idx + 1;
         } else {
-          texture = await PIXI.Assets.load(`/content/${mediaItem.path}`);
+          // At end: pause, then switch shape
+          setIsPaused(true);
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          timeoutRef.current = setTimeout(() => {
+            setShapeIdx((i) => (i + 1) % SHAPES.length);
+            setCurrentIdx(0);
+            setIsPaused(false);
+          }, PAUSE_MS);
+          return idx;
         }
-        
-        textures.push(texture);
-      } catch (error) {
-        console.error('Failed to load:', mediaItem.path);
-      }
-    }
-    
-    texturesRef.current = textures;
-    console.log('Paths: loadTextures complete, loaded', textures.length, 'textures');
-    setTexturesReady(true);
-  }, [media]);
-
-  // Initialize PIXI
-  useEffect(() => {
-    if (!containerRef.current || !media.length) return;
-
-    let mounted = true;
-
-    const initApp = async () => {
-      console.log('Paths: initApp starting');
-      
-      // Clean up existing app and canvas
-      if (appRef.current) {
-        console.log('Paths: Destroying existing PIXI app');
-        appRef.current.destroy(true);
-        appRef.current = null;
-      }
-
-      // Clear any existing canvas elements
-      if (containerRef.current) {
-        while (containerRef.current.firstChild) {
-          containerRef.current.removeChild(containerRef.current.firstChild);
-        }
-      }
-
-      if (!mounted) return;
-
-      // Create new app
-      const app = new PIXI.Application();
-      await app.init({
-        width: window.innerWidth,
-        height: window.innerHeight,
-        backgroundColor: 0x000000,
       });
-
-      if (!mounted || !containerRef.current) {
-        app.destroy(true);
-        return;
-      }
-
-      console.log('Paths: Adding canvas to container');
-      containerRef.current.appendChild(app.canvas);
-      appRef.current = app;
-
-      // Load textures
-      await loadTextures();
-      
-      if (!mounted) {
-        app.destroy(true);
-        return;
-      }
-      
-      // Start animation ticker
-      app.ticker.add(animateFlowPath);
-      console.log('Paths: PIXI app initialization complete');
-    };
-
-    initApp();
-
+    }, STEP_MS);
     return () => {
-      console.log('Paths: Cleanup function called');
-      mounted = false;
-      
-      if (appRef.current) {
-        console.log('Paths: Destroying PIXI app in cleanup');
-        appRef.current.destroy(true);
-        appRef.current = null;
-      }
-      
-      // Clear container
-      if (containerRef.current) {
-        while (containerRef.current.firstChild) {
-          containerRef.current.removeChild(containerRef.current.firstChild);
-        }
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [media]); // Removed loadTextures from dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shapeIdx, isPaused, points.length, usedVideos.length]);
 
-  const animateFlowPath = useCallback((ticker: PIXI.Ticker) => {
-    if (!appRef.current || !appRef.current.stage || pathPointsRef.current.length === 0 || texturesRef.current.length === 0 || shuffledTexturesRef.current.length === 0) {
-      console.log('Paths: Animation blocked -', {
-        hasApp: !!appRef.current,
-        hasStage: !!appRef.current?.stage,
-        pathPointsLength: pathPointsRef.current.length,
-        texturesLength: texturesRef.current.length,
-        shuffledLength: shuffledTexturesRef.current.length
-      });
-      return;
-    }
-
-    const delta = ticker.deltaTime;
-
-    if (pauseCounterRef.current > 0) {
-      pauseCounterRef.current -= delta;
-      console.log('Paths: Pausing, frames left:', pauseCounterRef.current);
-      if (pauseCounterRef.current <= 0) {
-        // Reset for next cycle
-        console.log('Paths: Pause complete, restarting cycle');
-        updateGeneratedPath();
-      }
-      return;
-    }
-
-    const totalImagesToSpawn = shuffledTexturesRef.current.length;
-    const canSpawnMoreTextures = currentTextureIndexRef.current < totalImagesToSpawn;
-
-    console.log('Paths: Animation frame -', {
-      framesSinceSpawn: framesSinceSpawnRef.current.toFixed(2),
-      currentIndex: currentTextureIndexRef.current,
-      totalToSpawn: totalImagesToSpawn,
-      canSpawnMore: canSpawnMoreTextures,
-      nextSpawnFrame: spawnFrameScheduleRef.current[currentTextureIndexRef.current]
-    });
-
-    if (canSpawnMoreTextures) {
-      framesSinceSpawnRef.current += delta;
-      const imageIndex = currentTextureIndexRef.current;
-      const spawnFrame = spawnFrameScheduleRef.current[imageIndex] || 0;
-      
-      if (framesSinceSpawnRef.current >= spawnFrame) {
-        console.log('Paths: Spawning sprite', imageIndex + 1);
-        
-        // Uniform placement along the path
-        const texture = shuffledTexturesRef.current[imageIndex];
-        let targetPathIndex = 0;
-        
-        if (totalImagesToSpawn > 1) {
-          const t = imageIndex / (totalImagesToSpawn - 1);
-          targetPathIndex = Math.round(t * (pathPointsRef.current.length - 1));
-        } else {
-          targetPathIndex = Math.floor(pathPointsRef.current.length / 2);
-        }
-        
-        targetPathIndex = Math.max(0, Math.min(pathPointsRef.current.length - 1, targetPathIndex));
-        const spawnPoint = pathPointsRef.current[targetPathIndex];
-        
-        console.log('Paths: Spawn details -', {
-          textureValid: !!texture,
-          spawnPoint,
-          pathIndex: targetPathIndex
-        });
-        
-        if (texture && spawnPoint) {
-          const sprite = createSprite(texture, PATHS_CONSTANTS.MAX_BOUNDING_BOX_SIZE, PATHS_CONSTANTS.MAX_BOUNDING_BOX_SIZE);
-          if (!sprite) {
-            console.warn('Paths: Failed to create sprite for texture');
-            currentTextureIndexRef.current++;
-            return;
-          }
-          
-          sprite.anchor.set(0.5);
-          sprite.x = spawnPoint.x;
-          sprite.y = spawnPoint.y;
-          
-          console.log('Paths: Sprite created and positioned at', sprite.x, sprite.y);
-          
-          playVideoIfNeeded(texture);
-          appRef.current.stage.addChild(sprite);
-          displayedStaticSpritesOnPathRef.current.push(sprite);
-          
-          console.log('Paths: Sprite added to stage. Total sprites:', displayedStaticSpritesOnPathRef.current.length);
-          
-          currentTextureIndexRef.current++;
-        }
-      }
-    } else if (displayedStaticSpritesOnPathRef.current.length > 0 && pauseCounterRef.current <= 0) {
-      console.log('Paths: All sprites spawned, starting pause');
-      pauseCounterRef.current = PATHS_CONSTANTS.PAUSE_DURATION_FRAMES;
-    }
-  }, [updateGeneratedPath]);
-
-  if (!media.length) return <div>No media loaded</div>;
+  // Reset currentIdx when shape changes
+  useEffect(() => {
+    setCurrentIdx(0);
+  }, [shapeIdx]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Status */}
-      <div className="p-3 bg-gray-900 border-b border-gray-700">
-        <div className="text-xs text-gray-500">
-          {displayedStaticSpritesOnPathRef.current.length}/{media.length} sprites • 
-          {pathPointsRef.current.length} path points • 
-          {texturesReady ? (
-            <span className="text-green-400"> ✓ Ready</span>
-          ) : (
-            <span className="text-yellow-400"> ⏳ Loading...</span>
-          )}
-        </div>
-      </div>
-
-      {/* Canvas */}
-      <div className="flex-1 relative">
-        <div ref={containerRef} className="w-full h-full" />
-      </div>
+    <div
+      ref={containerRef}
+      style={{
+        position: "relative",
+        width: "100vw",
+        height: "100vh",
+        background: "black",
+        overflow: "hidden",
+      }}
+    >
+      {points.slice(0, currentIdx).map((pt, i) => {
+        const vid = usedVideos[i];
+        if (!vid) return null;
+        return (
+          <video
+            key={shapeIdx + "-" + i + "-" + vid.path}
+            src={`/content/${vid.path}`}
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{
+              position: "absolute",
+              left: pt.x - VIDEO_SIZE / 2,
+              top: pt.y - VIDEO_SIZE / 2,
+              width: VIDEO_SIZE,
+              height: VIDEO_SIZE,
+              objectFit: "cover",
+              transition: "left 0.04s linear, top 0.04s linear",
+            }}
+          />
+        );
+      })}
     </div>
   );
-} 
+}
+
+// Add static preload method to Paths
+Paths.preload = async function(media: MediaItem[] = []) {
+  if (!media?.length) return;
+  // Filter for videos
+  const videoMedia = media.filter((m) => /\.mp4$/i.test(m.name));
+  // Only preload up to 70 videos, looping if not enough
+  const N = 70;
+  const usedVideos = Array.from({ length: N }, (_, i) => videoMedia[i % videoMedia.length]);
+  const preloaders = usedVideos.map(item => {
+    const src = `/content/${item.path}`;
+    return new Promise(resolve => {
+      const video = document.createElement('video');
+      video.src = src;
+      video.preload = 'auto';
+      video.muted = true;
+      video.oncanplaythrough = () => resolve(true);
+      video.onerror = () => resolve(false);
+    });
+  });
+  await Promise.all(preloaders);
+}; 
