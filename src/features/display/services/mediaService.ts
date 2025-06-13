@@ -1,43 +1,121 @@
-import { MediaItem } from '@/types';
-
-// Utility function for proper array shuffling (Fisher-Yates)
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-};
+import { MediaItem, MediaApiResponse, MediaQueryOptions } from '@/shared/types/media';
+import { shuffleArray } from '@/shared/utils/shuffle';
 
 export class MediaService {
-  private static cache: { [path: string]: MediaItem[] } = {};
+  private static cache: { [path: string]: { data: MediaApiResponse; timestamp: number } } = {};
+  private static readonly CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 
   /**
-   * Fetch media items from a specific path
+   * Fetch media items from a specific path with enhanced options
    */
-  static async fetchMedia(path: string, recursive = true): Promise<MediaItem[]> {
+  static async fetchMedia(
+    path: string, 
+    options: Partial<MediaQueryOptions> = {}
+  ): Promise<MediaItem[]> {
+    const queryOptions: MediaQueryOptions = {
+      path,
+      recursive: true,
+      fileType: 'all',
+      sortBy: 'name',
+      sortOrder: 'asc',
+      page: 1,
+      limit: 1000, // Large limit to get all items for compatibility
+      ...options,
+    };
+
     try {
-      console.log(`MediaService: Fetching media from ${path}`);
-      const res = await fetch(`/api/media?path=${path}&recursive=${recursive}`);
+      console.log(`MediaService: Fetching media from ${path} with options:`, queryOptions);
       
-      if (!res.ok) {
-        throw new Error(`Failed to fetch media from ${path}`);
+      // Build query string
+      const searchParams = new URLSearchParams();
+      Object.entries(queryOptions).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (Array.isArray(value)) {
+            searchParams.set(key, value.join(','));
+          } else {
+            searchParams.set(key, value.toString());
+          }
+        }
+      });
+
+      const response = await fetch(`/api/media?${searchParams.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          // Include If-None-Match for caching if we have a cached ETag
+          ...(this.getCachedETag(path) && {
+            'If-None-Match': this.getCachedETag(path)!
+          })
+        },
+      });
+      
+      // Handle 304 Not Modified
+      if (response.status === 304) {
+        const cached = this.getCachedResponse(path);
+        if (cached) {
+          console.log(`MediaService: Using cached data for ${path} (304 Not Modified)`);
+          return cached.items;
+        }
       }
       
-      const data = await res.json();
+      if (!response.ok) {
+        throw new Error(`Failed to fetch media from ${path}: ${response.status} ${response.statusText}`);
+      }
       
-      const files = (data.items?.filter((item: MediaItem) =>
-        item.type === 'file' && 
-        /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name) &&
-        !item.name.startsWith('_hide_')
-      ) || []);
-
-      console.log(`MediaService: Found ${files.length} files in ${path}`);
-      return files;
+      const data: MediaApiResponse = await response.json();
+      
+      // Cache the response
+      this.setCachedResponse(path, data);
+      
+      console.log(`MediaService: Found ${data.items.length} files in ${path}`);
+      console.log(`MediaService: Stats - Total: ${data.stats?.totalFiles || 0}, Size: ${this.formatFileSize(data.stats?.totalSize || 0)}`);
+      
+      return data.items;
     } catch (error) {
       console.error(`MediaService: Error fetching media from ${path}:`, error);
       return [];
+    }
+  }
+
+  /**
+   * Fetch media with filtering and search
+   */
+  static async fetchFilteredMedia(options: MediaQueryOptions): Promise<{
+    items: MediaItem[];
+    pagination: MediaApiResponse['pagination'];
+    stats: MediaApiResponse['stats'];
+  }> {
+    try {
+      const searchParams = new URLSearchParams();
+      Object.entries(options).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (Array.isArray(value)) {
+            searchParams.set(key, value.join(','));
+          } else {
+            searchParams.set(key, value.toString());
+          }
+        }
+      });
+
+      const response = await fetch(`/api/media?${searchParams.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch filtered media: ${response.status}`);
+      }
+      
+      const data: MediaApiResponse = await response.json();
+      
+      return {
+        items: data.items,
+        pagination: data.pagination,
+        stats: data.stats,
+      };
+    } catch (error) {
+      console.error('MediaService: Error fetching filtered media:', error);
+      return {
+        items: [],
+        pagination: undefined,
+        stats: undefined,
+      };
     }
   }
 
@@ -55,17 +133,20 @@ export class MediaService {
     }
 
     try {
-      await Promise.all(
-        uniquePaths.map(async (path) => {
-          const files = await this.fetchMedia(path);
-          // Shuffle the media once when fetched
-          mediaCache[path] = shuffleArray(files);
-        })
-      );
+      // Fetch all paths in parallel
+      const fetchPromises = uniquePaths.map(async (path) => {
+        const files = await this.fetchMedia(path);
+        // Shuffle the media once when fetched for compatibility with existing modes
+        return { path, files: shuffleArray(files) };
+      });
 
-      // Update internal cache
-      Object.assign(this.cache, mediaCache);
+      const results = await Promise.all(fetchPromises);
       
+      // Build result object
+      results.forEach(({ path, files }) => {
+        mediaCache[path] = files;
+      });
+
       console.log('MediaService: Media fetch completed');
       return mediaCache;
     } catch (error) {
@@ -75,53 +156,152 @@ export class MediaService {
   }
 
   /**
-   * Get cached media for a path
+   * Get cached media for a path (legacy compatibility)
    */
   static getCachedMedia(path: string): MediaItem[] {
-    return this.cache[path] || [];
-  }
-
-  /**
-   * Clear media cache
-   */
-  static clearCache(): void {
-    this.cache = {};
-  }
-
-  /**
-   * Shuffle media array
-   */
-  static shuffle<T>(array: T[]): T[] {
-    return shuffleArray(array);
+    const cached = this.getCachedResponse(path);
+    return cached?.items || [];
   }
 
   /**
    * Filter media by type
    */
   static filterByType(media: MediaItem[], type: 'image' | 'video'): MediaItem[] {
-    const videoExtensions = /\.(mp4|webm|ogg)$/i;
-    const imageExtensions = /\.(jpg|jpeg|png|gif|webp)$/i;
-    
     return media.filter(item => {
       if (type === 'video') {
-        return videoExtensions.test(item.name);
+        return item.mimeType?.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(item.name);
       } else {
-        return imageExtensions.test(item.name);
+        return item.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name);
       }
+    });
+  }
+
+  /**
+   * Filter media by dimensions
+   */
+  static filterByDimensions(
+    media: MediaItem[], 
+    minWidth?: number, 
+    maxWidth?: number, 
+    minHeight?: number, 
+    maxHeight?: number
+  ): MediaItem[] {
+    return media.filter(item => {
+      if (!item.dimensions) return false;
+      
+      if (minWidth && item.dimensions.width < minWidth) return false;
+      if (maxWidth && item.dimensions.width > maxWidth) return false;
+      if (minHeight && item.dimensions.height < minHeight) return false;
+      if (maxHeight && item.dimensions.height > maxHeight) return false;
+      
+      return true;
+    });
+  }
+
+  /**
+   * Filter media by file size
+   */
+  static filterBySize(media: MediaItem[], minSize?: number, maxSize?: number): MediaItem[] {
+    return media.filter(item => {
+      if (!item.fileSize) return false;
+      if (minSize && item.fileSize < minSize) return false;
+      if (maxSize && item.fileSize > maxSize) return false;
+      return true;
+    });
+  }
+
+  /**
+   * Search media by name, path, or tags
+   */
+  static searchMedia(media: MediaItem[], query: string): MediaItem[] {
+    const searchLower = query.toLowerCase();
+    return media.filter(item => {
+      const nameMatch = item.name.toLowerCase().includes(searchLower);
+      const pathMatch = item.path.toLowerCase().includes(searchLower);
+      const tagsMatch = item.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+      return nameMatch || pathMatch || tagsMatch;
     });
   }
 
   /**
    * Get media stats
    */
-  static getMediaStats(media: MediaItem[]): { total: number; images: number; videos: number } {
+  static getMediaStats(media: MediaItem[]): { 
+    total: number; 
+    images: number; 
+    videos: number; 
+    totalSize: number;
+    averageSize: number;
+    withDimensions: number;
+  } {
     const images = this.filterByType(media, 'image');
     const videos = this.filterByType(media, 'video');
+    const totalSize = media.reduce((sum, item) => sum + (item.fileSize || 0), 0);
+    const withDimensions = media.filter(item => item.dimensions).length;
     
     return {
       total: media.length,
       images: images.length,
-      videos: videos.length
+      videos: videos.length,
+      totalSize,
+      averageSize: media.length > 0 ? totalSize / media.length : 0,
+      withDimensions,
     };
+  }
+
+  /**
+   * Format file size for display
+   */
+  static formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * Clear all caches
+   */
+  static clearCache(): void {
+    this.cache = {};
+    console.log('MediaService: Cache cleared');
+  }
+
+  /**
+   * Get cache statistics
+   */
+  static getCacheStats(): { entries: number; memoryUsage: string } {
+    const entries = Object.keys(this.cache).length;
+    const memoryUsage = this.formatFileSize(
+      JSON.stringify(this.cache).length * 2 // Rough estimate (UTF-16)
+    );
+    return { entries, memoryUsage };
+  }
+
+  // Private helper methods
+  private static getCachedResponse(path: string): MediaApiResponse | null {
+    const cached = this.cache[path];
+    if (!cached) return null;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > this.CACHE_TTL) {
+      delete this.cache[path];
+      return null;
+    }
+    
+    return cached.data;
+  }
+
+  private static setCachedResponse(path: string, data: MediaApiResponse): void {
+    this.cache[path] = {
+      data,
+      timestamp: Date.now(),
+    };
+  }
+
+  private static getCachedETag(path: string): string | null {
+    const cached = this.getCachedResponse(path);
+    return cached?.cache?.etag || null;
   }
 } 

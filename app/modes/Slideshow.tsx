@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { MediaItem } from '../types/media';
 import styles from './modes.module.scss';
@@ -13,14 +13,57 @@ export default function Slideshow({ media }: SlideshowProps) {
   const [currentItems, setCurrentItems] = useState<MediaItem[]>([]);
   const [cycleDuration] = useState(4000); // 4 seconds
   
+  // Group media by project for intelligent pairing
+  const mediaByProject = useMemo(() => {
+    const grouped: { [project: string]: MediaItem[] } = {};
+    
+    media.forEach(item => {
+      const project = item.project || 'unknown';
+      if (!grouped[project]) {
+        grouped[project] = [];
+      }
+      grouped[project].push(item);
+    });
+    
+    // Filter out projects with only 1 item for better pairing
+    const projectsWithMultipleItems = Object.entries(grouped)
+      .filter(([_, items]) => items.length >= 2);
+    
+    return {
+      all: grouped,
+      multiItem: Object.fromEntries(projectsWithMultipleItems)
+    };
+  }, [media]);
+  
   useEffect(() => {
     if (!media?.length) return;
 
     const updateItems = () => {
-      // Get 1-2 random items
-      const shuffled = [...media].sort(() => Math.random() - 0.5);
-      const itemCount = Math.random() > 0.7 ? 1 : 2; // 30% chance of single item
-      setCurrentItems(shuffled.slice(0, itemCount));
+      const shouldShowSingle = Math.random() > 0.7; // 30% chance of single item
+      
+      if (shouldShowSingle) {
+        // Single item - can be from any project
+        const shuffled = [...media].sort(() => Math.random() - 0.5);
+        setCurrentItems([shuffled[0]]);
+      } else {
+        // Dual items - must be from same project
+        const projectsWithPairs = Object.keys(mediaByProject.multiItem);
+        
+        if (projectsWithPairs.length === 0) {
+          // No projects with multiple items, fall back to single item
+          const shuffled = [...media].sort(() => Math.random() - 0.5);
+          setCurrentItems([shuffled[0]]);
+          return;
+        }
+        
+        // Pick a random project that has multiple items
+        const selectedProject = projectsWithPairs[Math.floor(Math.random() * projectsWithPairs.length)];
+        const projectItems = mediaByProject.multiItem[selectedProject];
+        
+        // Shuffle and pick 2 items from this project
+        const shuffled = [...projectItems].sort(() => Math.random() - 0.5);
+        setCurrentItems(shuffled.slice(0, 2));
+      }
     };
 
     // Initial load
@@ -29,7 +72,7 @@ export default function Slideshow({ media }: SlideshowProps) {
     // Set up interval
     const interval = setInterval(updateItems, cycleDuration);
     return () => clearInterval(interval);
-  }, [media, cycleDuration]);
+  }, [media, mediaByProject, cycleDuration]);
 
   const renderMediaItem = (item: MediaItem, verticalAlign: 'top' | 'bottom', horizontalAlign: 'left' | 'right') => {
     const isVideo = /\.(mp4|webm|ogg)$/i.test(item.name);
@@ -98,6 +141,7 @@ export default function Slideshow({ media }: SlideshowProps) {
   }
 
   const isSingleItem = currentItems.length === 1;
+  const currentProject = currentItems[0]?.project;
 
   return (
     <div className={`${styles.modeContainer} flex`}>
@@ -118,6 +162,14 @@ export default function Slideshow({ media }: SlideshowProps) {
             {currentItems[1] && renderMediaItem(currentItems[1], 'bottom', 'right')}
           </div>
         </>
+      )}
+      
+      {/* Project indicator */}
+      {currentProject && (
+        <div className="fixed bottom-4 left-4 z-40 bg-black/60 text-white px-3 py-1 rounded text-sm">
+          Project: {currentProject}
+          {!isSingleItem && ` (${currentItems.length} items)`}
+        </div>
       )}
     </div>
   );

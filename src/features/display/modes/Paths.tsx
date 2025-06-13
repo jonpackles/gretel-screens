@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MediaItem } from "../types/media";
+import { MediaItem } from "@/shared/types/media";
 
 const SHAPES = ["house", "sine", "infinity", "circle"] as const;
 type ShapeName = typeof SHAPES[number];

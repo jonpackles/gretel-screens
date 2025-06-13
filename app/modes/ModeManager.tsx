@@ -5,7 +5,7 @@ import { MediaItem } from '../types/media';
 import { useKeyboard } from '../../src/shared/hooks/useKeyboard';
 
 // Import all available modes
-import Slideshow from './Slideshow';
+import Slideshow from '../../src/features/display/modes/Slideshow';
 import Calendar from './Calendar';
 import VerticalCarousel from './VerticalCarousel';
 import Marquee from './Marquee';

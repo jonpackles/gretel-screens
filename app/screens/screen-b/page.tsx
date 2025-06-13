@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ModeManager, { ModeSequenceItem } from '../../modes/ModeManager';
+import ModeManager from '../../../src/features/display/components/ModeManager';
+
+export type ModeSequenceItem = {
+  mode: string;
+  duration?: number;
+  mediaPath?: string;
+};
 
 export default function ScreenB() {
   const [sequence, setSequence] = useState<ModeSequenceItem[] | null>(null);

@@ -1,32 +1,19 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef, Suspense } from 'react';
-import { useKeyboard } from '@/hooks';
-import { MediaItem, APP_DEFAULTS } from '@/shared';
-import { 
-  MediaService, 
-  PreloadService, 
-  SequenceService,
-  ModeSequenceItem,
-  ModeConfig 
-} from '../../services';
-import { MODE_REGISTRY, getModeComponent } from '../../modes';
-import { DEFAULT_MODE_DURATIONS } from '@/constants/modes';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { MediaItem } from '@/shared/types/media';
+import { useKeyboard } from '@/shared/hooks/useKeyboard';
 
-// Import all available modes
-import Slideshow from './Slideshow';
-import Calendar from './Calendar';
-import VerticalCarousel from './VerticalCarousel';
-import Marquee from './Marquee';
-import Mosaic from './Mosaic';
-// import Glass from './Glass';
-import PoseHouse from './PoseHouse';
-import Inform from './Inform';
-import ProjectsMode from './inform/ProjectsMode';
-import InformCalendar from './inform/Calendar';
-import InformProjects from './inform/ProjectsMode';
-import Grid from './Grid';
-import Paths from './Paths';
+// Import all available modes from the new structure
+import Slideshow from '../../modes/Slideshow';
+import Calendar from '../../modes/Calendar';
+import VerticalCarousel from '../../modes/VerticalCarousel';
+import Marquee from '../../modes/Marquee';
+import Mosaic from '../../modes/Mosaic';
+import PoseHouse from '../../modes/PoseHouse';
+import Inform from '../../modes/Inform';
+import Grid from '../../modes/Grid';
+import Paths from '../../modes/Paths';
 
 // Utility function for proper array shuffling (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -99,34 +86,16 @@ const MODE_CONFIGS: ModeConfig[] = [
     mediaPath: undefined, // Inform doesn't need media
   },
   {
-    component: ProjectsMode,
-    name: 'Projects',
-    duration: 30000, // 30 seconds
-    mediaPath: undefined, // ProjectsMode doesn't need media (uses API)
-  },
-  {
-    component: InformCalendar,
-    name: 'Inform Calendar',
-    duration: 30000, // 30 seconds
-    mediaPath: undefined, // No media needed
-  },
-  {
-    component: InformProjects,
-    name: 'Inform Projects',
-    duration: 30000, // 30 seconds
-    mediaPath: undefined, // No media needed
-  },
-  {
     component: Grid,
     name: 'Grid',
     duration: 30000, // 30 seconds
-    mediaPath: 'linked-content/projects', // or whichever path you want for grid assets
+    mediaPath: 'linked-content/projects',
   },
   {
     component: Paths,
     name: 'Paths',
     duration: 30000, // 30 seconds
-    mediaPath: 'linked-content/projects', // or whichever path you want for grid assets
+    mediaPath: 'linked-content/projects',
   },
 ];
 
@@ -149,8 +118,8 @@ async function preloadMode(modeConfig: ModeConfig | null | undefined, media: Med
 }
 
 export default function ModeManager({
-  autoRotate = APP_DEFAULTS.AUTO_ROTATE,
-  showControls = APP_DEFAULTS.SHOW_CONTROLS,
+  autoRotate = true,
+  showControls = false,
   sequence,
 }: ModeManagerProps) {
   const [currentModeIndex, setCurrentModeIndex] = useState(0);
@@ -159,23 +128,18 @@ export default function ModeManager({
   const [isFading, setIsFading] = useState(false);
   const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Convert sequence to mode configs
-  const activeModes = useMemo((): ModeConfig[] => {
-    if (!sequence) return [];
+  // Compute active modes based on sequence prop
+  const activeModes = useMemo(() => {
+    if (!sequence) return MODE_CONFIGS;
 
     return sequence
       .map((item) => {
-        const component = getModeComponent(item.mode);
-        if (!component) {
-          console.warn(`Mode not found: ${item.mode}`);
-          return null;
-        }
-        
+        const base = MODE_CONFIGS.find((m) => m.name === item.mode);
+        if (!base) return null;
         return {
-          component,
-          name: item.mode,
-          duration: item.duration ?? DEFAULT_MODE_DURATIONS[item.mode as keyof typeof DEFAULT_MODE_DURATIONS] ?? 30000,
-          mediaPath: item.mediaPath,
+          ...base,
+          duration: item.duration ?? base.duration,
+          mediaPath: item.mediaPath ?? base.mediaPath,
         };
       })
       .filter((m): m is ModeConfig => !!m);
@@ -190,11 +154,12 @@ export default function ModeManager({
     console.log('ModeManager: Current mode:', currentMode?.name);
   }, [activeModes, currentModeIndex, currentMode]);
 
-  // Fetch media for all active modes
+  // Fetch media for all active modes that need it
   useEffect(() => {
     const fetchAllMedia = async () => {
       console.log('ModeManager: Starting media fetch...');
       setLoading(true);
+      const mediaCache: { [path: string]: MediaItem[] } = {};
       
       // Get unique media paths from active modes only
       const mediaPaths = Array.from(new Set(
@@ -203,11 +168,38 @@ export default function ModeManager({
           .filter(Boolean) as string[]
       ));
 
+      console.log('ModeManager: Media paths to fetch:', mediaPaths);
+
       try {
-        const mediaCache = await MediaService.fetchMultipleMedia(mediaPaths);
+        if (mediaPaths.length === 0) {
+          console.log('ModeManager: No media paths needed, skipping fetch');
+          setMedia({});
+          setLoading(false);
+          return;
+        }
+
+        await Promise.all(
+          mediaPaths.map(async (path) => {
+            console.log(`ModeManager: Fetching media from ${path}`);
+            const res = await fetch(`/api/media?path=${path}&recursive=true&limit=10000`);
+            const data = await res.json();
+            
+            const files = (data.items?.filter((item: MediaItem) =>
+              item.type === 'file' && 
+              /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name) &&
+              !item.name.startsWith('_hide_')
+            ) || []);
+
+            console.log(`ModeManager: Found ${files.length} files in ${path}`);
+            // Store unshuffled media - we'll shuffle fresh each time
+            mediaCache[path] = files;
+          })
+        );
+
         setMedia(mediaCache);
-      } catch (error) {
-        console.error('ModeManager: Error fetching media:', error);
+        console.log('ModeManager: Media fetch completed');
+      } catch (err) {
+        console.error('ModeManager: Error fetching media:', err);
       } finally {
         setLoading(false);
       }
@@ -216,8 +208,6 @@ export default function ModeManager({
     // Only fetch if we have active modes
     if (activeModes.length > 0) {
       fetchAllMedia();
-    } else {
-      setLoading(false);
     }
   }, [activeModes]);
 
@@ -227,6 +217,8 @@ export default function ModeManager({
       return;
     }
 
+    const fadeDuration = 2000; // 2 seconds
+
     const timeout = setTimeout(() => {
       setIsFading(true);
 
@@ -235,7 +227,7 @@ export default function ModeManager({
           (prevIndex + 1) % activeModes.length
         );
         setIsFading(false);
-      }, APP_DEFAULTS.FADE_DURATION);
+      }, fadeDuration);
     }, currentMode.duration);
 
     return () => {
@@ -247,11 +239,16 @@ export default function ModeManager({
   // Preload next mode for smooth transitions
   useEffect(() => {
     if (!autoRotate || loading || !currentMode || activeModes.length === 0) return;
+    const nextIndex = (currentModeIndex + 1) % activeModes.length;
+    const nextMode = activeModes[nextIndex] ?? null;
+    const nextMediaPath = nextMode?.mediaPath;
     
-    PreloadService.preloadNextMode(currentModeIndex, activeModes, media);
+    // Use freshly shuffled media for preloading too
+    const nextMedia = nextMediaPath ? shuffleArray(media[nextMediaPath] || []) : [];
+    preloadMode(nextMode, nextMedia);
   }, [currentModeIndex, activeModes, autoRotate, loading, currentMode, media]);
 
-  // Keyboard navigation
+  // Use shared keyboard hook for navigation
   useKeyboard({
     onNext: () => setCurrentModeIndex((prev) => (prev + 1) % activeModes.length),
     onPrev: () => setCurrentModeIndex((prev) => prev === 0 ? activeModes.length - 1 : prev - 1),
@@ -264,7 +261,7 @@ export default function ModeManager({
       <div className="flex items-center justify-center w-full h-screen bg-black">
         <div className="text-white text-center">
           <div className="text-2xl mb-4">No modes selected</div>
-          <div className="text-sm">Available modes: {Object.keys(MODE_REGISTRY).join(', ')}</div>
+          <div className="text-sm">Available modes: {MODE_CONFIGS.map(m => m.name).join(', ')}</div>
         </div>
       </div>
     );
@@ -284,8 +281,14 @@ export default function ModeManager({
     return null;
   }
 
-  // Get media for current mode
-  const currentMedia = currentMode?.mediaPath ? media[currentMode.mediaPath] || [] : [];
+  // Get media for current mode - shuffle fresh each time for variety
+  const currentMedia = currentMode?.mediaPath 
+    ? (() => {
+        const shuffled = shuffleArray(media[currentMode.mediaPath] || []);
+        console.log(`ModeManager: Freshly shuffled ${shuffled.length} items for ${currentMode.name}`);
+        return shuffled;
+      })()
+    : [];
 
   // Early return if no current mode
   if (!currentMode) {
@@ -307,13 +310,7 @@ export default function ModeManager({
     <div className="relative w-full h-screen">
       {/* Current Mode with fade transition */}
       <div className={`transition-opacity duration-1000 w-full h-full ${isFading ? 'opacity-0' : 'opacity-100'}`}>
-        <Suspense fallback={
-          <div className="flex items-center justify-center w-full h-full bg-black text-white">
-            <div className="text-xl">Loading {currentMode.name}...</div>
-          </div>
-        }>
-          <CurrentModeComponent {...modeProps} />
-        </Suspense>
+        <CurrentModeComponent {...modeProps} />
       </div>
 
       {/* Mode Indicator (always visible) */}

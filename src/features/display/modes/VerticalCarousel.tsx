@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import MediaDisplay from '@/components/MediaDisplay';
-import { MediaItem } from '../types/media';
+import { MediaItem } from '@/shared/types/media';
 import styles from './VerticalCarousel.module.scss';
 import modeStyles from './modes.module.scss';
 

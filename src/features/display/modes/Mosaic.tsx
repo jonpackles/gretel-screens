@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as PIXI from 'pixi.js';
-import { MediaItem } from '../types/media';
+import { MediaItem } from '@/shared/types/media';
 import styles from './modes.module.scss';
 
 type MosaicProps = {

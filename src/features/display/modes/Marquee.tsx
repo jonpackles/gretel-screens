@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MediaItem } from '../types/media';
+import { MediaItem } from '@/shared/types/media';
 import styles from './modes.module.scss';
 
 type MarqueeProps = {
