@@ -1,8 +1,17 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { MediaItem } from '../types/media';
-import { useKeyboard } from '../../src/shared/hooks/useKeyboard';
+import { useEffect, useState, useMemo, useRef, Suspense } from 'react';
+import { useKeyboard } from '@/hooks';
+import { MediaItem, APP_DEFAULTS } from '@/shared';
+import { 
+  MediaService, 
+  PreloadService, 
+  SequenceService,
+  ModeSequenceItem,
+  ModeConfig 
+} from '../../services';
+import { MODE_REGISTRY, getModeComponent } from '../../modes';
+import { DEFAULT_MODE_DURATIONS } from '@/constants/modes';
 
 // Import all available modes
 import Slideshow from './Slideshow';
@@ -140,29 +149,33 @@ async function preloadMode(modeConfig: ModeConfig | null | undefined, media: Med
 }
 
 export default function ModeManager({
-  autoRotate = true,
-  showControls = false,
+  autoRotate = APP_DEFAULTS.AUTO_ROTATE,
+  showControls = APP_DEFAULTS.SHOW_CONTROLS,
   sequence,
 }: ModeManagerProps) {
   const [currentModeIndex, setCurrentModeIndex] = useState(0);
   const [media, setMedia] = useState<{ [path: string]: MediaItem[] }>({});
   const [loading, setLoading] = useState(true);
-  const [timeRemaining, setTimeRemaining] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Compute active modes based on sequence prop
-  const activeModes = useMemo(() => {
-    if (!sequence) return MODE_CONFIGS;
+  // Convert sequence to mode configs
+  const activeModes = useMemo((): ModeConfig[] => {
+    if (!sequence) return [];
 
     return sequence
       .map((item) => {
-        const base = MODE_CONFIGS.find((m) => m.name === item.mode);
-        if (!base) return null;
+        const component = getModeComponent(item.mode);
+        if (!component) {
+          console.warn(`Mode not found: ${item.mode}`);
+          return null;
+        }
+        
         return {
-          ...base,
-          duration: item.duration ?? base.duration,
-          mediaPath: item.mediaPath ?? base.mediaPath,
+          component,
+          name: item.mode,
+          duration: item.duration ?? DEFAULT_MODE_DURATIONS[item.mode as keyof typeof DEFAULT_MODE_DURATIONS] ?? 30000,
+          mediaPath: item.mediaPath,
         };
       })
       .filter((m): m is ModeConfig => !!m);
@@ -177,12 +190,11 @@ export default function ModeManager({
     console.log('ModeManager: Current mode:', currentMode?.name);
   }, [activeModes, currentModeIndex, currentMode]);
 
-  // Fetch media for all active modes that need it
+  // Fetch media for all active modes
   useEffect(() => {
     const fetchAllMedia = async () => {
       console.log('ModeManager: Starting media fetch...');
       setLoading(true);
-      const mediaCache: { [path: string]: MediaItem[] } = {};
       
       // Get unique media paths from active modes only
       const mediaPaths = Array.from(new Set(
@@ -191,38 +203,11 @@ export default function ModeManager({
           .filter(Boolean) as string[]
       ));
 
-      console.log('ModeManager: Media paths to fetch:', mediaPaths);
-
       try {
-        if (mediaPaths.length === 0) {
-          console.log('ModeManager: No media paths needed, skipping fetch');
-          setMedia({});
-          setLoading(false);
-          return;
-        }
-
-        await Promise.all(
-          mediaPaths.map(async (path) => {
-            console.log(`ModeManager: Fetching media from ${path}`);
-            const res = await fetch(`/api/media?path=${path}&recursive=true`);
-            const data = await res.json();
-            
-            const files = (data.items?.filter((item: MediaItem) =>
-              item.type === 'file' && 
-              /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name) &&
-              !item.name.startsWith('_hide_')
-            ) || []);
-
-            console.log(`ModeManager: Found ${files.length} files in ${path}`);
-            // Shuffle the media once when fetched
-            mediaCache[path] = shuffleArray(files);
-          })
-        );
-
+        const mediaCache = await MediaService.fetchMultipleMedia(mediaPaths);
         setMedia(mediaCache);
-        console.log('ModeManager: Media fetch completed');
-      } catch (err) {
-        console.error('ModeManager: Error fetching media:', err);
+      } catch (error) {
+        console.error('ModeManager: Error fetching media:', error);
       } finally {
         setLoading(false);
       }
@@ -231,6 +216,8 @@ export default function ModeManager({
     // Only fetch if we have active modes
     if (activeModes.length > 0) {
       fetchAllMedia();
+    } else {
+      setLoading(false);
     }
   }, [activeModes]);
 
@@ -240,8 +227,6 @@ export default function ModeManager({
       return;
     }
 
-    const fadeDuration = 2000; // 2 seconds
-
     const timeout = setTimeout(() => {
       setIsFading(true);
 
@@ -250,7 +235,7 @@ export default function ModeManager({
           (prevIndex + 1) % activeModes.length
         );
         setIsFading(false);
-      }, fadeDuration);
+      }, APP_DEFAULTS.FADE_DURATION);
     }, currentMode.duration);
 
     return () => {
@@ -259,16 +244,14 @@ export default function ModeManager({
     };
   }, [currentModeIndex, currentMode?.duration, autoRotate, loading, currentMode, activeModes]);
 
-  // In ModeManager component, add this useEffect for preloading the next mode
+  // Preload next mode for smooth transitions
   useEffect(() => {
     if (!autoRotate || loading || !currentMode || activeModes.length === 0) return;
-    const nextIndex = (currentModeIndex + 1) % activeModes.length;
-    const nextMode = activeModes[nextIndex] ?? null;
-    const nextMediaPath = nextMode?.mediaPath;
-    preloadMode(nextMode, nextMediaPath ? media[nextMediaPath] || [] : []); // Preload in background
+    
+    PreloadService.preloadNextMode(currentModeIndex, activeModes, media);
   }, [currentModeIndex, activeModes, autoRotate, loading, currentMode, media]);
 
-  // Use shared keyboard hook for navigation
+  // Keyboard navigation
   useKeyboard({
     onNext: () => setCurrentModeIndex((prev) => (prev + 1) % activeModes.length),
     onPrev: () => setCurrentModeIndex((prev) => prev === 0 ? activeModes.length - 1 : prev - 1),
@@ -281,7 +264,7 @@ export default function ModeManager({
       <div className="flex items-center justify-center w-full h-screen bg-black">
         <div className="text-white text-center">
           <div className="text-2xl mb-4">No modes selected</div>
-          <div className="text-sm">Available modes: {MODE_CONFIGS.map(m => m.name).join(', ')}</div>
+          <div className="text-sm">Available modes: {Object.keys(MODE_REGISTRY).join(', ')}</div>
         </div>
       </div>
     );
@@ -324,7 +307,13 @@ export default function ModeManager({
     <div className="relative w-full h-screen">
       {/* Current Mode with fade transition */}
       <div className={`transition-opacity duration-1000 w-full h-full ${isFading ? 'opacity-0' : 'opacity-100'}`}>
-        <CurrentModeComponent {...modeProps} />
+        <Suspense fallback={
+          <div className="flex items-center justify-center w-full h-full bg-black text-white">
+            <div className="text-xl">Loading {currentMode.name}...</div>
+          </div>
+        }>
+          <CurrentModeComponent {...modeProps} />
+        </Suspense>
       </div>
 
       {/* Mode Indicator (always visible) */}
