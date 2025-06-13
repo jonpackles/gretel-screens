@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { MediaItem } from '@/shared/types/media';
 import styles from './modes.module.scss';
+import slideshowStyles from './Slideshow.module.scss';
 
 type SlideshowProps = {
   media: MediaItem[];
@@ -11,7 +12,7 @@ type SlideshowProps = {
 
 export default function Slideshow({ media }: SlideshowProps) {
   const [currentItems, setCurrentItems] = useState<MediaItem[]>([]);
-  const [cycleDuration] = useState(5000); // 4 seconds
+  const [cycleDuration] = useState(10000); 
   
   // Group media by project for intelligent pairing
   const mediaByProject = useMemo(() => {
@@ -88,49 +89,36 @@ export default function Slideshow({ media }: SlideshowProps) {
     return () => clearInterval(interval);
   }, [media, mediaByProject, cycleDuration]);
 
-  const renderMediaItem = (item: MediaItem, verticalAlign: 'top' | 'bottom', horizontalAlign: 'left' | 'right') => {
+  const renderMediaItem = (item: MediaItem) => {
     const isVideo = /\.(mp4|webm|ogg)$/i.test(item.name);
     const src = `/content/${item.path}`;
 
-    // Determine alignment classes
-    const alignmentClasses = {
-      vertical: verticalAlign === 'top' ? 'items-start' : 'items-end',
-      horizontal: horizontalAlign === 'left' ? 'justify-start' : 'justify-end'
-    };
-
     if (isVideo) {
       return (
-        <div className={`w-full h-full flex ${alignmentClasses.vertical} ${alignmentClasses.horizontal}`}>
-          <video
-            key={src}
-            className="max-w-full max-h-full object-contain"
-            autoPlay
-            muted
-            loop
-            playsInline
-          >
-            <source src={src} type="video/mp4" />
-          </video>
-        </div>
+        <video
+          key={src}
+          autoPlay
+          muted
+          loop
+          playsInline
+         
+        >
+          <source src={src} type="video/mp4" />
+        </video>
       );
     }
 
     return (
-      <div className={`w-full h-full flex ${alignmentClasses.vertical} ${alignmentClasses.horizontal}`}>
-        <Image
-          key={src}
-          src={src}
-          alt={item.name}
-          width={1920}
-          height={1080}
-          className="max-w-full max-h-full object-contain"
-          priority
-          style={{
-            width: 'auto',
-            height: 'auto',
-          }}
-        />
-      </div>
+      <Image
+        key={src}
+        src={src}
+        alt={item.name}
+        width={1920}
+        height={1080}
+        className="max-w-full max-h-full object-contain"
+        priority
+      
+      />
     );
   };
 
@@ -159,21 +147,17 @@ export default function Slideshow({ media }: SlideshowProps) {
 
   return (
     <div className={`${styles.modeContainer} flex`}>
-      {isSingleItem ? (
-        // Single item takes full width and height
-        <div className="w-full h-full overflow-hidden flex items-center justify-start">
-          {renderMediaItem(currentItems[0], Math.random() < 0.5 ? 'top' : 'bottom', Math.random() < 0.5 ? 'left' : 'right')}
+       {isSingleItem ? (
+        <div className={`w-full h-full overflow-hidden flex ${Math.random() < 0.5 ? 'items-start' : 'items-end'} ${Math.random() < 0.5 ? 'justify-start' : 'justify-end'}`}>
+          {renderMediaItem(currentItems[0])}
         </div>
       ) : (
         <>
-          {/* Left Container - 50% width, full height */}
-          <div className="w-1/2 h-full overflow-hidden justify-start">
-            {currentItems[0] && renderMediaItem(currentItems[0], 'top', 'left')}
+          <div className={slideshowStyles.half + ' ' + slideshowStyles.left}>
+            {currentItems[0] && renderMediaItem(currentItems[0])}
           </div>
-          
-          {/* Right Container - 50% width, full height */}
-          <div className="w-1/2 h-full overflow-hidden justify-end">
-            {currentItems[1] && renderMediaItem(currentItems[1], 'bottom', 'right')}
+          <div className={slideshowStyles.half + ' ' + slideshowStyles.right}>
+            {currentItems[1] && renderMediaItem(currentItems[1])}
           </div>
         </>
       )}
