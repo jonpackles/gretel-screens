@@ -1,0 +1,144 @@
+// /* Typography scale */
+// #inform {
+//   --font-large: 2rem;
+//   --font-medium: 1.25rem;
+//   --font-small: 0.875rem;
+//   --font-mono: "IBM Plex Mono", monospace;
+
+//   /* Heading sizes */
+//   --h1-poster: clamp(80px, 10vw, 128px);
+//   --h2-poster: clamp(60px, 6vw, 96px);
+//   --h3-poster: clamp(48px, 4vw, 72px);
+//   --h4-poster: clamp(36px, 3vw, 60px);
+
+//   --h1-list: clamp(40px, 4vw, 64px);
+//   --h2-list: clamp(32px, 3vw, 48px);
+//   --h3-list: clamp(24px, 2vw, 36px);
+//   --h4-list: clamp(18px, 1.5vw, 28px);
+// }
+
+// /* Typography classes */
+// .h1Poster {
+//   font-size: var(--h1-poster) !important;
+//   color: red !important; /* Debug color */
+//   font-weight: bold !important;
+// }
+
+// .h1List {
+//   font-size: var(--h1-list) !important;
+//   color: green !important; /* Debug color */
+//   font-weight: bold !important;
+// }
+
+// .h2Poster {
+//   font-size: var(--h2-poster) !important;
+//   color: blue !important; /* Debug color */
+// }
+
+// .h2List {
+//   font-size: var(--h2-list) !important;
+//   color: orange !important; /* Debug color */
+// }
+
+// .blockWrapper {
+//     border-top: 1px solid #fff;
+//     transition: all 0.3s ease;
+//     position: relative;
+    
+//     &--poster {
+//         border-top: none;
+//     }
+    
+//     &--list {
+//         margin: 24px;
+//     }
+// }
+
+// /* General block styling */
+// .block {
+    
+//     // border-top: 1px solid #fff;
+//     // background-color: #fff;
+//     margin-bottom: 24px;
+//     font-family: var(--font-mono);
+//     line-height: 1.4;
+//     color: #fff;
+//   }
+
+// /* Tags and meta */
+// .tag {
+//   display: inline-block;
+// //   border: 1px solid #000;
+//   padding: 4px 8px;
+// //   font-size: var(--font-small);
+//   font-weight: 600;
+//   border-radius: 999px;
+//   margin-bottom: 12px;
+// }
+
+// /* Titles */
+// .title {
+// //   font-size: var(--font-large);
+//   font-weight: 600;
+//   margin-bottom: 8px;
+// }
+
+// .subtitle {
+// //   font-size: var(--font-medium);
+//   margin-bottom: 8px;
+// }
+
+// /* Date + time block */
+// .meta {
+// //   font-size: var(--font-small);
+//   margin-top: 12px;
+//   color: #111;
+// }
+
+// /* Image block (if used) */
+// .image {
+//   margin-top: 16px;
+//   border: 1px solid #ccc;
+//   width: 100%;
+//   max-width: 100%;
+// }
+
+// /* Divider */
+// .divider {
+//   height: 1px;
+//   background: #000;
+//   margin: 16px 0;
+// }
+
+// /* Mode Toggle Button */
+// .modeToggle {
+//   position: absolute;
+//   top: 8px;
+//   right: 8px;
+//   background: rgba(0, 0, 0, 0.7);
+//   color: white;
+//   border: none;
+//   border-radius: 4px;
+//   padding: 4px 8px;
+//   cursor: pointer;
+//   font-size: 16px;
+//   z-index: 10;
+//   transition: all 0.2s ease;
+  
+//   &:hover {
+//     background: rgba(0, 0, 0, 0.9);
+//   }
+  
+//   &--poster {
+//     /* Toggle button styles in poster mode */
+//   }
+  
+//   &--list {
+//     /* Toggle button styles in list mode */
+//   }
+// }
+
+// .blockContent {
+//   /* Content wrapper styles */
+//   position: relative;
+// }

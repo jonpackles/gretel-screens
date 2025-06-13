@@ -3,4 +3,5 @@ export type MediaItem = {
   type: 'file';
   path: string;
   project?: string;
+  visibility?: 'visible' | 'hidden';
 }; 

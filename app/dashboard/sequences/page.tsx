@@ -1,31 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ModeSequenceItem } from '../../modes/ModeManager';
-
-const AVAILABLE_MODES = [
-  'Slideshow',
-  'Vertical Carousel',
-  'Marquee',
-  'Calendar',
-  'Mosaic',
-  'Glass (Camera)',
-  'Pose House',
-  'Inform Calendar',
-  'Inform Projects',
-  'Grid',
-];
-
-const AVAILABLE_SCREENS = ['screen-a', 'screen-b'];
-
-const MEDIA_PATHS = [
-  'linked-content/projects',
-  'linked-content/posters',
-  // Add more as needed
-];
+import { ModeSequenceItem } from '@/features/display';
+import { AVAILABLE_MODES, AVAILABLE_SCREENS, MEDIA_PATHS } from '@/shared/constants/modes';
 
 export default function SequenceEditor() {
-  const [selectedScreen, setSelectedScreen] = useState('screen-a');
+  const [selectedScreen, setSelectedScreen] = useState<string>(AVAILABLE_SCREENS[0]);
   const [sequence, setSequence] = useState<ModeSequenceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -126,7 +106,7 @@ export default function SequenceEditor() {
       {/* Sidebar */}
       <div className="w-[240px] border-r border-gray-200 p-6 space-y-2 overflow-y-auto h-screen">
         <h2 className="text-sm text-gray-500 uppercase tracking-wide mb-4">Screens</h2>
-        {AVAILABLE_SCREENS.map(screen => (
+        {AVAILABLE_SCREENS.map((screen: string) => (
           <div
             key={screen}
             onClick={() => setSelectedScreen(screen)}
@@ -216,7 +196,7 @@ export default function SequenceEditor() {
                         onChange={(e) => updateMode(index, 'mode', e.target.value)}
                         className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
-                        {AVAILABLE_MODES.map(mode => (
+                        {AVAILABLE_MODES.map((mode: string) => (
                           <option key={mode} value={mode}>{mode}</option>
                         ))}
                       </select>
@@ -244,7 +224,7 @@ export default function SequenceEditor() {
                         className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="">-- Select media path --</option>
-                        {MEDIA_PATHS.map(path => (
+                        {MEDIA_PATHS.map((path: string) => (
                           <option key={path} value={path}>{path}</option>
                         ))}
                       </select>
