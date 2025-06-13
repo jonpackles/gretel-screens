@@ -16,6 +16,7 @@ import ProjectsMode from './inform/ProjectsMode';
 import InformCalendar from './inform/Calendar';
 import InformProjects from './inform/ProjectsMode';
 import Grid from './Grid';
+import Paths from './Paths';
 
 // Utility function for proper array shuffling (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -108,6 +109,12 @@ const MODE_CONFIGS: ModeConfig[] = [
   {
     component: Grid,
     name: 'Grid',
+    duration: 30000, // 30 seconds
+    mediaPath: 'linked-content/projects', // or whichever path you want for grid assets
+  },
+  {
+    component: Paths,
+    name: 'Paths',
     duration: 30000, // 30 seconds
     mediaPath: 'linked-content/projects', // or whichever path you want for grid assets
   },
@@ -260,20 +267,18 @@ export default function ModeManager({
     preloadMode(nextMode, nextMediaPath ? media[nextMediaPath] || [] : []); // Preload in background
   }, [currentModeIndex, activeModes, autoRotate, loading, currentMode, media]);
 
-  // Manual mode switching
-  const switchToMode = (index: number) => {
-    setCurrentModeIndex(index);
-  };
-
-  const nextMode = () => {
-    setCurrentModeIndex((prev) => (prev + 1) % activeModes.length);
-  };
-
-  const prevMode = () => {
-    setCurrentModeIndex((prev) => 
-      prev === 0 ? activeModes.length - 1 : prev - 1
-    );
-  };
+  // Keyboard navigation
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight') {
+        setCurrentModeIndex((prev) => (prev + 1) % activeModes.length);
+      } else if (e.key === 'ArrowLeft') {
+        setCurrentModeIndex((prev) => prev === 0 ? activeModes.length - 1 : prev - 1);
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [activeModes.length]);
 
   // Handle empty or invalid mode selection
   if (activeModes.length === 0) {
@@ -326,56 +331,6 @@ export default function ModeManager({
       <div className={`transition-opacity duration-1000 w-full h-full ${isFading ? 'opacity-0' : 'opacity-100'}`}>
         <CurrentModeComponent {...modeProps} />
       </div>
-
-      {/* Controls Overlay */}
-      {showControls && (
-        <div className="fixed top-4 left-4 z-50 bg-black/80 text-white p-4 rounded-lg">
-          <div className="text-sm mb-2">
-            Mode: {currentMode.name} ({currentModeIndex + 1}/{activeModes.length})
-          </div>
-          
-          {autoRotate && (
-            <div className="text-xs mb-3">
-              Next in: {Math.ceil(timeRemaining / 1000)}s
-            </div>
-          )}
-
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={prevMode}
-              className="px-2 py-1 bg-white/20 rounded text-xs hover:bg-white/30"
-            >
-              ← Prev
-            </button>
-            <button
-              onClick={nextMode}
-              className="px-2 py-1 bg-white/20 rounded text-xs hover:bg-white/30"
-            >
-              Next →
-            </button>
-          </div>
-
-          {/* Show active modes */}
-          <div className="grid grid-cols-2 gap-1 text-xs">
-            {activeModes.map((mode, index) => (
-              <button
-                key={`${mode.name}-${index}`}
-                onClick={() => switchToMode(index)}
-                className={`px-2 py-1 rounded ${
-                  index === currentModeIndex
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white/20 hover:bg-white/30'
-                }`}
-              >
-                {mode.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Show excluded modes if any */}
-          {/* (No excluded modes section, as sequence does not support this directly) */}
-        </div>
-      )}
 
       {/* Mode Indicator (always visible) */}
       <div className="fixed bottom-4 right-4 z-40 bg-black/60 text-white px-3 py-1 rounded text-sm">
