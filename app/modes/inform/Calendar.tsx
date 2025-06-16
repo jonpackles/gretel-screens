@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { basel, quadrant, droulers } from '@/styles/fonts';
 import Block from '@/components/inform/Block';
-import styles from '../modes.module.scss';
+import styles from '@/features/display/modes/modes.module.scss';
 import '@/styles/inform/inform.scss';
 
 let calendarCache: any[] | null = null;
