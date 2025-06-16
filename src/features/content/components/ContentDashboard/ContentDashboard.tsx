@@ -87,7 +87,7 @@ export function ContentDashboard() {
         {selectedProject ? (
           <>
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-semibold">{selectedProject.name}</h1>
+              <h1 className="text-2xl font-semibold text-black">{selectedProject.name}</h1>
               <div className="space-x-2">
                 {Object.keys(pendingVisibilityChanges).length > 0 && (
                   <>
