@@ -5,7 +5,6 @@ import { MediaItem } from '@/types';
 export const Calendar = lazy(() => import('./Calendar'));
 export const Grid = lazy(() => import('./Grid'));
 export const Inform = lazy(() => import('./Inform'));
-export const Marquee = lazy(() => import('./Marquee'));
 export const Mosaic = lazy(() => import('./Mosaic'));
 export const Paths = lazy(() => import('./Paths'));
 export const PoseHouse = lazy(() => import('./PoseHouse'));
@@ -21,7 +20,6 @@ export const MODE_REGISTRY = {
   'Calendar': Calendar,
   'Grid': Grid,
   'Inform': Inform,
-  'Marquee': Marquee,
   'Mosaic': Mosaic,
   'Paths': Paths,
   'Pose House': PoseHouse,
