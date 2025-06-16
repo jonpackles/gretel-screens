@@ -101,6 +101,7 @@ export default function Slideshow({ media }: SlideshowProps) {
           muted
           loop
           playsInline
+          className="max-w-full max-h-full object-contain"
          
         >
           <source src={src} type="video/mp4" />
@@ -147,16 +148,17 @@ export default function Slideshow({ media }: SlideshowProps) {
 
   return (
     <div className={`${styles.modeContainer} flex`}>
+      {/* <div><h2 className="rotate-90">{currentProject}</h2></div> */}
        {isSingleItem ? (
         <div className={`w-full h-full overflow-hidden flex ${Math.random() < 0.5 ? 'items-start' : 'items-end'} ${Math.random() < 0.5 ? 'justify-start' : 'justify-end'}`}>
           {renderMediaItem(currentItems[0])}
         </div>
       ) : (
         <>
-          <div className={slideshowStyles.half + ' ' + slideshowStyles.left}>
+          <div className="w-1/2 h-full overflow-hidden flex items-start justify-start">
             {currentItems[0] && renderMediaItem(currentItems[0])}
           </div>
-          <div className={slideshowStyles.half + ' ' + slideshowStyles.right}>
+          <div className="w-1/2 h-full overflow-hidden flex items-end justify-end">
             {currentItems[1] && renderMediaItem(currentItems[1])}
           </div>
         </>

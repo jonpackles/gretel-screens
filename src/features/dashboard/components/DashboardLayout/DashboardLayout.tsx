@@ -31,7 +31,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="px-6 py-4">
           {/* Navigation Tabs */}
           <div className="">
-            <nav className="flex space-x-8">
+            <nav className="flex space-x-8 gap-x-8">
               {navItems.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (

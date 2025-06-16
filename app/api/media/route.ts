@@ -138,10 +138,14 @@ async function processFile(absolutePath: string, relativePath: string, stat: fs.
 function mergeVisibilityData(items: MediaItem[]): MediaItem[] {
   const visibilityDb = loadVisibilityDb();
   
-  return items.map(item => ({
-    ...item,
-    visibility: visibilityDb[item.path] || 'visible'
-  }));
+  return items.map(item => {
+    // Normalize the path to use forward slashes
+    const normalizedPath = item.path.replace(/\\/g, '/');
+    return {
+      ...item,
+      visibility: visibilityDb[normalizedPath] || 'visible'
+    };
+  });
 }
 
 /**
@@ -305,10 +309,13 @@ export async function GET(req: NextRequest) {
       console.log(`🔄 Fetching fresh media data for: ${options.path}`);
       items = await getEnhancedDirectoryContents(fullPath, options.path, options.recursive);
       
+      // Merge visibility data before caching
+      items = mergeVisibilityData(items);
+      
       // Generate ETag based on items and timestamp
       const itemsHash = require('crypto')
         .createHash('md5')
-        .update(JSON.stringify(items.map(i => ({ path: i.path, lastModified: i.lastModified }))))
+        .update(JSON.stringify(items.map(i => ({ path: i.path, lastModified: i.lastModified, visibility: i.visibility }))))
         .digest('hex');
       responseETag = `"${itemsHash}-${now}"`;
       
@@ -331,11 +338,8 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Merge visibility data first
-    const itemsWithVisibility = mergeVisibilityData(items);
-
     // Apply filters (including visibility filtering)
-    const filteredItems = itemsWithVisibility.filter(item => matchesFilters(item, options, includeHidden));
+    const filteredItems = items.filter(item => matchesFilters(item, options, includeHidden));
     
     // Apply sorting
     const sortedItems = sortItems(filteredItems, options.sortBy, options.sortOrder);

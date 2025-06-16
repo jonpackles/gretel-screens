@@ -15,13 +15,22 @@ export function MediaItem({ item, index, pendingVisibilityChange, isFocused, onF
   const isHidden = effectiveVisibility === 'hidden';
   const isStaged = !!pendingVisibilityChange;
 
+  console.log('MediaItem visibility state:', {
+    path: item.path,
+    itemVisibility: item.visibility,
+    pendingVisibilityChange,
+    effectiveVisibility,
+    isHidden
+  });
+
   return (
     <div
       tabIndex={0}
       onFocus={onFocus}
-      className={`relative aspect-square overflow-hidden bg-gray-100 transition-all outline-none focus:ring-2 focus:ring-yellow-400 rounded ${
+      className={`relative w-full overflow-hidden bg-gray-100 transition-all outline-none border focus:ring-2 focus:ring-yellow-400 rounded ${
         isHidden ? 'opacity-50 grayscale' : ''
       } ${isStaged ? 'ring-2 ring-yellow-500' : ''} ${isFocused ? 'outline outline-blue-500' : ''}`}
+      style={{ aspectRatio: '1/1' }}
     >
       {/\.mp4$/i.test(item.name) ? (
         <LazyVideo

@@ -8,8 +8,6 @@ import { useKeyboard } from '@/shared/hooks/useKeyboard';
 import Slideshow from '../../modes/Slideshow';
 import Calendar from '../../modes/Calendar';
 import VerticalCarousel from '../../modes/VerticalCarousel';
-import Marquee from '../../modes/Marquee';
-import Mosaic from '../../modes/Mosaic';
 import PoseHouse from '../../modes/PoseHouse';
 import Inform from '../../modes/Inform';
 import Grid from '../../modes/Grid';
@@ -59,23 +57,10 @@ const MODE_CONFIGS: ModeConfig[] = [
     mediaPath: 'linked-content/posters',
   },
   {
-    component: Marquee,
-    name: 'Marquee',
-    duration: 30000, // 30 seconds
-    mediaPath: 'linked-content/projects',
-  },
-  {
     component: Calendar,
     name: 'Calendar',
     duration: 5000, // 20 seconds
     mediaPath: undefined, // Calendar doesn't need media
-  },
-  {
-    component: Mosaic,
-    name: 'Mosaic',
-    duration: 40000, // 40 seconds
-    mediaPath: 'linked-content/projects',
-    props: { maskSource: 'pose' as const },
   },
   {
     component: PoseHouse,

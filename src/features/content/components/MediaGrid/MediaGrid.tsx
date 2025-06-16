@@ -24,6 +24,7 @@ export function MediaGrid({ media, pendingVisibilityChanges, onToggleVisibility 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'h' && focusedIndex !== null) {
         const item = media[focusedIndex];
+        console.log('Toggling visibility for item:', item, 'Current state:', pendingVisibilityChanges[item.path] || item.visibility || 'visible');
         onToggleVisibility(item);
       }
     };

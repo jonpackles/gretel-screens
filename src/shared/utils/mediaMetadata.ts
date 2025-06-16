@@ -222,7 +222,7 @@ export async function extractMetadata(filePath: string): Promise<ExtractedMetada
  */
 export class MetadataCache {
   private static cache = new Map<string, { metadata: ExtractedMetadata; timestamp: number }>();
-  private static readonly CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours for file cache
+  private static readonly CACHE_TTL = 1000 * 60 * 60 * 96; // 96 hours for file cache
   private static readonly CACHE_FILE = '.cache/metadata.json';
   private static initialized = false;
   
