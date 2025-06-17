@@ -1,6 +1,6 @@
 import React from "react";
 import Block from "./Block";
-import { ContentBlock } from "@/types/inform/inform";
+import { ContentBlock } from "@/shared/types/inform/inform";
 import styles from "./inform.module.scss";
 
 type Props = {

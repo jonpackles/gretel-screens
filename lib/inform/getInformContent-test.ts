@@ -1,4 +1,4 @@
-import { ContentBlock } from "@/types/inform/inform";
+import { ContentBlock } from "@/shared/types/inform/inform";
 
 export const getInformContent = async (): Promise<ContentBlock[]> => {
   return [

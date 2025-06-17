@@ -101,7 +101,7 @@ const MODE_CONFIGS: ModeConfig[] = [
   },
 ];
 
-interface ModeManagerProps {
+export interface ModeManagerProps {
   autoRotate?: boolean;
   showControls?: boolean;
   sequence?: ModeSequenceItem[];

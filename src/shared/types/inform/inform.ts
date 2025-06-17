@@ -2,6 +2,7 @@ export type ContentBlock = {
     id: string;
     type: "announcement" | "event" | "project";
     data: EventData | ProjectData;
+    internal?: boolean;  // Optional boolean to indicate if the block is internal
   };
   
   export type EventData = {

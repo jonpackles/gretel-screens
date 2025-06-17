@@ -1,4 +1,4 @@
-import { ContentBlock } from "@/types/inform/inform";
+import { ContentBlock } from "@/shared/types/inform/inform";
 import { getGoogleCalendarEvents } from "@/lib/getGoogleCalendarEvents";
 import { fetchProjectsFromSheet } from "./fetch/fetchProjectsFromSheet";
 

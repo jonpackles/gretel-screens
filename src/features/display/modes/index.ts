@@ -32,7 +32,7 @@ export const MODE_REGISTRY = {
 export type ModeRegistryKey = keyof typeof MODE_REGISTRY;
 
 // Type for mode components that support preloading
-export interface ModeComponent extends React.ComponentType<{ media: MediaItem[] }> {
+export type ModeComponent = React.ComponentType<{ media: MediaItem[] }> & {
   preload?: (media: MediaItem[]) => Promise<void>;
 }
 
