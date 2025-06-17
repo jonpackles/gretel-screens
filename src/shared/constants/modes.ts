@@ -2,10 +2,7 @@
 export const AVAILABLE_MODES = [
   'Slideshow',
   'Vertical Carousel',
-  'Marquee',
-  'Calendar',
   'Mosaic',
-  'Glass (Camera)',
   'Pose House',
   'Inform Calendar',
   'Inform Projects',
@@ -18,10 +15,7 @@ export type ModeName = typeof AVAILABLE_MODES[number];
 export const DEFAULT_MODE_DURATIONS = {
   'Slideshow': 10000,
   'Vertical Carousel': 5000,
-  'Marquee': 30000,
-  'Calendar': 5000,
   'Mosaic': 40000,
-  'Glass (Camera)': 30000,
   'Pose House': 30000,
   'Inform Calendar': 30000,
   'Inform Projects': 30000,

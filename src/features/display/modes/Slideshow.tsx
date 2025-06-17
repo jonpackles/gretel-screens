@@ -40,7 +40,7 @@ export default function Slideshow({ media }: SlideshowProps) {
     if (!media?.length) return;
 
     const updateItems = () => {
-      const shouldShowSingle = Math.random() > 0.7; // 30% chance of single item
+      const shouldShowSingle = Math.random() > 0.6; // 40% chance of single item
       
       if (shouldShowSingle) {
         // Single item - can be from any project - use proper shuffle
@@ -145,6 +145,8 @@ export default function Slideshow({ media }: SlideshowProps) {
 
   const isSingleItem = currentItems.length === 1;
   const currentProject = currentItems[0]?.project;
+
+
 
   return (
     <div className={`${styles.modeContainer} flex`}>

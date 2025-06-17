@@ -3,5 +3,10 @@
     height: 100vh;
     overflow: hidden;
     position: relative;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
     // cursor: none; commenting out for dev
 }
