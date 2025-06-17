@@ -1,40 +1,83 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { MediaItem } from '@/shared/types/media';
+import styles from './modes.module.scss';
 
 const GRID_COLS = 7;
 const GRID_ROWS = 14; // 7 x 14 = 98
 const GRID_SIZE = GRID_COLS * GRID_ROWS;
 const SCROLL_SPEED = 0.03; // px per ms
 
-// Double the number of rows for more scrollable area
-const VISIBLE_ROWS = GRID_ROWS * 2;
-const VISIBLE_SIZE = GRID_COLS * VISIBLE_ROWS;
+// Initial visible rows
+const INITIAL_VISIBLE_ROWS = GRID_ROWS * 2;
+const INITIAL_VISIBLE_SIZE = GRID_COLS * INITIAL_VISIBLE_ROWS;
 
 // Animation constants
 const FADE_IN_DELAY = 50; // ms between each item animation
 const FADE_IN_DURATION = 800; // ms for each item to fade in
+
+// Scroll threshold for adding new rows (percentage of total height)
+const SCROLL_THRESHOLD = 0.7;
 
 type GridProps = {
   media: MediaItem[];
 };
 
 export default function Grid({ media }: GridProps) {
-  // Shuffle and slice to 98 items, then repeat to fill VISIBLE_SIZE
   const [gridItems, setGridItems] = useState<MediaItem[]>([]);
   const [visibleItems, setVisibleItems] = useState<Set<number>>(new Set());
+  const [totalRows, setTotalRows] = useState(INITIAL_VISIBLE_ROWS);
   const containerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollY = useRef(0);
   const animationTimeouts = useRef<NodeJS.Timeout[]>([]);
+  const isAddingRows = useRef(false);
 
+  // Function to generate more grid items
+  const generateMoreItems = () => {
+    if (!media?.length || isAddingRows.current) return;
+    
+    isAddingRows.current = true;
+    const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, GRID_SIZE);
+    setGridItems(prev => [...prev, ...shuffled]);
+    setTotalRows(prev => prev + GRID_ROWS);
+    isAddingRows.current = false;
+  };
+
+  // Initial grid setup
   useEffect(() => {
     if (!media?.length) return;
     const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, GRID_SIZE);
-    // Repeat the rows to double the scrollable area
     setGridItems([...shuffled, ...shuffled]);
   }, [media]);
 
-  // Fade-in animation effect - dynamic start point with safety buffer
+  // Scroll detection for adding more rows
+  useEffect(() => {
+    if (gridItems.length === 0) return;
+
+    const checkScroll = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const scrollPercentage = container.scrollTop / (container.scrollHeight - container.clientHeight);
+      
+      if (scrollPercentage > SCROLL_THRESHOLD) {
+        generateMoreItems();
+      }
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkScroll);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', checkScroll);
+      }
+    };
+  }, [gridItems]);
+
+  // Fade-in animation effect
   useEffect(() => {
     if (gridItems.length === 0) return;
 
@@ -47,9 +90,7 @@ export default function Grid({ media }: GridProps) {
 
     // Dynamic configuration
     const SAFETY_BUFFER = 3;
-    const START_ROW = Math.max(0, GRID_ROWS - SAFETY_BUFFER); // Row 11 (14-3)
-    
-    console.log(`Grid: Starting animation from row ${START_ROW} (GRID_ROWS=${GRID_ROWS}, SAFETY_BUFFER=${SAFETY_BUFFER})`);
+    const START_ROW = Math.max(0, GRID_ROWS - SAFETY_BUFFER);
     
     // Calculate animation order (from START_ROW going upward)
     const animationOrder: number[] = [];
@@ -62,8 +103,6 @@ export default function Grid({ media }: GridProps) {
       }
     }
 
-    console.log(`Grid: Animating ${animationOrder.length} items from row ${START_ROW} upward`);
-
     // Trigger animations with staggered delays
     animationOrder.forEach((itemIndex, orderIndex) => {
       const timeout = setTimeout(() => {
@@ -75,23 +114,27 @@ export default function Grid({ media }: GridProps) {
 
     // Show all remaining items immediately (below START_ROW)
     const remainingItems: number[] = [];
-    for (let row = START_ROW + 1; row < VISIBLE_ROWS; row++) {
+    for (let row = START_ROW + 1; row < totalRows; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
         const index = row * GRID_COLS + col;
-        if (index < VISIBLE_SIZE) {
+        if (index < gridItems.length) {
           remainingItems.push(index);
         }
       }
     }
     
     // Show remaining items immediately
-    setVisibleItems(prev => new Set([...remainingItems]));
+    setVisibleItems(prev => {
+      const newSet = new Set(prev);
+      remainingItems.forEach(item => newSet.add(item));
+      return newSet;
+    });
 
     // Cleanup timeouts on unmount
     return () => {
       animationTimeouts.current.forEach(timeout => clearTimeout(timeout));
     };
-  }, [gridItems]);
+  }, [gridItems, totalRows]);
 
   // Animation loop for seamless upward scrolling
   useEffect(() => {
@@ -116,7 +159,7 @@ export default function Grid({ media }: GridProps) {
 
   // Build grid rows
   const rows = [];
-  for (let r = 0; r < VISIBLE_ROWS; r++) {
+  for (let r = 0; r < totalRows; r++) {
     const row = gridItems.slice(r * GRID_COLS, (r + 1) * GRID_COLS);
     rows.push(row);
   }
@@ -132,9 +175,10 @@ export default function Grid({ media }: GridProps) {
   return (
     <div
       ref={containerRef}
+      className={styles.modeContainer}
       style={{
         height: '100vh',
-        overflow: 'hidden',
+        overflow: 'auto',
         position: 'relative',
         width: '100vw',
         background: 'black',
@@ -156,7 +200,7 @@ export default function Grid({ media }: GridProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateRows: `repeat(${VISIBLE_ROWS}, 1fr)`,
+          gridTemplateRows: `repeat(${totalRows}, 1fr)`,
           gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
           width: '110vw',
           marginLeft: '-5vw',
@@ -184,7 +228,7 @@ export default function Grid({ media }: GridProps) {
                     width: '100%',
                     height: '100%',
                     aspectRatio: '1 / 1',
-                    overflow: (cIdx === 0 || cIdx === GRID_COLS - 1 || rIdx === 0 || rIdx === VISIBLE_ROWS - 1) ? 'visible' : 'hidden',
+                    overflow: (cIdx === 0 || cIdx === GRID_COLS - 1 || rIdx === 0 || rIdx === totalRows - 1) ? 'visible' : 'hidden',
                   }}
                 >
                   {isVideo ? (

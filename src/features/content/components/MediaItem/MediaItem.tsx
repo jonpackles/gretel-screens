@@ -15,13 +15,15 @@ export function MediaItem({ item, index, pendingVisibilityChange, isFocused, onF
   const isHidden = effectiveVisibility === 'hidden';
   const isStaged = !!pendingVisibilityChange;
 
-  console.log('MediaItem visibility state:', {
-    path: item.path,
-    itemVisibility: item.visibility,
-    pendingVisibilityChange,
-    effectiveVisibility,
-    isHidden
-  });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('MediaItem visibility state:', {
+      path: item.path,
+      itemVisibility: item.visibility,
+      pendingVisibilityChange,
+      effectiveVisibility,
+      isHidden
+    });
+  }
 
   return (
     <div
@@ -31,6 +33,8 @@ export function MediaItem({ item, index, pendingVisibilityChange, isFocused, onF
         isHidden ? 'opacity-50 grayscale' : ''
       } ${isStaged ? 'ring-2 ring-yellow-500' : ''} ${isFocused ? 'outline outline-blue-500' : ''}`}
       style={{ aspectRatio: '1/1' }}
+      data-visibility={effectiveVisibility}
+      data-staged={isStaged}
     >
       {/\.mp4$/i.test(item.name) ? (
         <LazyVideo

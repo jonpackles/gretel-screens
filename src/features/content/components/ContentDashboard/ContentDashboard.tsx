@@ -11,6 +11,9 @@ export function ContentDashboard() {
   const [selectedProject, setSelectedProject] = useState<FileItem | null>(null);
   const [media, setMedia] = useState<FileItem[]>([]);
   const [pendingVisibilityChanges, setPendingVisibilityChanges] = useState<Record<string, 'visible' | 'hidden'>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -26,9 +29,11 @@ export function ContentDashboard() {
     console.log('Selecting project:', project.name);
     setSelectedProject(project);
     setPendingVisibilityChanges({});
-    const mediaFiles = await ContentService.fetchProjectMedia(project.path);
-    console.log('Media files loaded for project:', mediaFiles.length, mediaFiles.slice(0, 3));
-    setMedia(mediaFiles);
+    setCurrentPage(1);
+    const { items, pagination } = await ContentService.fetchProjectMedia(project.path);
+    console.log('Media files loaded for project:', items.length, items.slice(0, 3));
+    setMedia(items);
+    setHasMore(pagination.hasMore);
   };
 
   const handleToggleVisibility = (item: FileItem) => {
@@ -41,14 +46,36 @@ export function ContentDashboard() {
     }));
   };
 
+  const loadMore = async () => {
+    if (!selectedProject || isLoadingMore || !hasMore) return;
+    
+    setIsLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const { items, pagination } = await ContentService.fetchProjectMedia(
+        selectedProject.path,
+        false,
+        nextPage
+      );
+      
+      setMedia(prev => [...prev, ...items]);
+      setCurrentPage(nextPage);
+      setHasMore(pagination.hasMore);
+    } catch (error) {
+      console.error('Error loading more media:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   const applyVisibilityChanges = async () => {
     try {
       await ContentService.batchUpdateVisibility(pendingVisibilityChanges);
       setPendingVisibilityChanges({});
       if (selectedProject) {
         // Refresh project data to get updated visibility states
-        const mediaFiles = await ContentService.fetchProjectMedia(selectedProject.path, true);
-        setMedia(mediaFiles);
+        const { items } = await ContentService.fetchProjectMedia(selectedProject.path, true);
+        setMedia(items);
       }
     } catch (error) {
       console.error('Error applying visibility changes:', error);
@@ -59,20 +86,31 @@ export function ContentDashboard() {
     setPendingVisibilityChanges({});
   };
 
-  const toggleVisibilityAll = () => {
-    const allHidden = media.every(item => {
-      const effectiveVisibility = pendingVisibilityChanges[item.path] ?? item.visibility ?? 'visible';
-      return effectiveVisibility === 'hidden';
-    });
+  const toggleVisibilityAll = async () => {
+    if (!selectedProject) return;
     
-    const newVisibility = allHidden ? 'visible' : 'hidden';
-    const updates: Record<string, 'visible' | 'hidden'> = {};
-    
-    media.forEach(item => {
-      updates[item.path] = newVisibility;
-    });
-    
-    setPendingVisibilityChanges(updates);
+    try {
+      // Fetch all items in the project
+      const allItems = await ContentService.fetchAllProjectMedia(selectedProject.path);
+      
+      // Determine new visibility state based on currently visible items
+      const allHidden = media.every(item => {
+        const effectiveVisibility = pendingVisibilityChanges[item.path] ?? item.visibility ?? 'visible';
+        return effectiveVisibility === 'hidden';
+      });
+      
+      const newVisibility = allHidden ? 'visible' : 'hidden';
+      const updates: Record<string, 'visible' | 'hidden'> = {};
+      
+      // Apply to all items in the project
+      allItems.forEach(item => {
+        updates[item.path] = newVisibility;
+      });
+      
+      setPendingVisibilityChanges(updates);
+    } catch (error) {
+      console.error('Error toggling visibility for all items:', error);
+    }
   };
 
   return (
@@ -123,6 +161,9 @@ export function ContentDashboard() {
               media={media}
               pendingVisibilityChanges={pendingVisibilityChanges}
               onToggleVisibility={handleToggleVisibility}
+              hasMore={hasMore}
+              isLoadingMore={isLoadingMore}
+              onLoadMore={loadMore}
             />
           </>
         ) : (

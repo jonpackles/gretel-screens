@@ -79,6 +79,7 @@ export default function Paths({ media }: { media: MediaItem[] }) {
   const [shapeIdx, setShapeIdx] = useState(0);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [mediaIdx, setMediaIdx] = useState(0); // Track position in media array
   const [isPaused, setIsPaused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -103,8 +104,12 @@ export default function Paths({ media }: { media: MediaItem[] }) {
   const basePath = getShapePath(SHAPES[shapeIdx], 100);
   const points = getEvenlySpacedPoints(basePath, VIDEO_SPACING, containerSize.width, containerSize.height);
   const videoMedia = media.filter((m) => /\.mp4$/i.test(m.name));
-  // Use as many videos as needed, looping if not enough
-  const usedVideos = Array.from({ length: points.length }, (_, i) => videoMedia[i % videoMedia.length]);
+  
+  // Use videos starting from current mediaIdx position
+  const usedVideos = Array.from({ length: points.length }, (_, i) => {
+    const idx = (mediaIdx + i) % videoMedia.length;
+    return videoMedia[idx];
+  });
 
   // Animation logic
   useEffect(() => {
@@ -122,6 +127,8 @@ export default function Paths({ media }: { media: MediaItem[] }) {
           timeoutRef.current = setTimeout(() => {
             setShapeIdx((i) => (i + 1) % SHAPES.length);
             setCurrentIdx(0);
+            // Update mediaIdx to continue from where we left off
+            setMediaIdx((prev) => (prev + points.length) % videoMedia.length);
             setIsPaused(false);
           }, PAUSE_MS);
           return idx;

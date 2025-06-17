@@ -17,18 +17,32 @@ export class ContentService {
     }
   }
 
-  static async fetchProjectMedia(projectPath: string, bustCache = false): Promise<FileItem[]> {
+  static async fetchProjectMedia(
+    projectPath: string, 
+    bustCache = false,
+    page = 1,
+    limit = 50
+  ): Promise<{ items: FileItem[]; pagination: { total: number; hasMore: boolean } }> {
     try {
       const cacheBuster = bustCache ? `&_t=${Date.now()}` : '';
-      const res = await fetch(`/api/media?path=${encodeURIComponent(projectPath)}&recursive=true&includeHidden=true${cacheBuster}`);
+      const res = await fetch(
+        `/api/media?path=${encodeURIComponent(projectPath)}&recursive=true&includeHidden=true&page=${page}&limit=${limit}${cacheBuster}`
+      );
       const data = await res.json();
       const mediaFiles = data.items?.filter((item: FileItem) =>
         item.type === 'file' && /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name)
       ) || [];
-      return mediaFiles;
+      
+      return {
+        items: mediaFiles,
+        pagination: {
+          total: data.pagination?.total || 0,
+          hasMore: data.pagination?.hasNext || false
+        }
+      };
     } catch (error) {
       console.error('Error fetching project media:', error);
-      return [];
+      return { items: [], pagination: { total: 0, hasMore: false } };
     }
   }
 
@@ -74,6 +88,20 @@ export class ContentService {
       return data.hiddenFiles || [];
     } catch (error) {
       console.error('Error fetching hidden files:', error);
+      return [];
+    }
+  }
+
+  static async fetchAllProjectMedia(projectPath: string): Promise<FileItem[]> {
+    try {
+      const res = await fetch(`/api/media?path=${encodeURIComponent(projectPath)}&recursive=true&includeHidden=true&limit=10000`);
+      const data = await res.json();
+      const mediaFiles = data.items?.filter((item: FileItem) =>
+        item.type === 'file' && /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name)
+      ) || [];
+      return mediaFiles;
+    } catch (error) {
+      console.error('Error fetching all project media:', error);
       return [];
     }
   }

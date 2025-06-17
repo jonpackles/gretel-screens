@@ -183,7 +183,7 @@ export default function ModeManager({
         await Promise.all(
           mediaPaths.map(async (path) => {
             console.log(`ModeManager: Fetching media from ${path}`);
-            const res = await fetch(`/api/media?path=${path}&recursive=true&limit=10000`);
+            const res = await fetch(`/api/media?path=${path}&recursive=true&limit=10000&includeHidden=false`);
             const data = await res.json();
             
             const files = (data.items?.filter((item: MediaItem) =>

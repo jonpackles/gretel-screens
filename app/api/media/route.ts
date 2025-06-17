@@ -16,7 +16,7 @@ const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', 
 
 // In-memory cache for directory listings
 const directoryCache = new Map<string, { items: MediaItem[]; timestamp: number; etag: string }>();
-const DIRECTORY_CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+const DIRECTORY_CACHE_TTL = 1000 * 60 * 1; // 5 minutes
 
 /**
  * Check if file should be included based on filters
@@ -109,7 +109,12 @@ async function processFile(absolutePath: string, relativePath: string, stat: fs.
     ? pathParts[projectIndex + 1] 
     : undefined;
 
-  // Create base MediaItem (without visibility - that's added later)
+  // Get visibility from database
+  const visibilityDb = loadVisibilityDb();
+  const normalizedPath = relativePath.replace(/\\/g, '/');
+  const visibility = visibilityDb[normalizedPath] || 'visible';
+
+  // Create base MediaItem with visibility
   const mediaItem: MediaItem = {
     name,
     type: 'file' as const,
@@ -118,6 +123,7 @@ async function processFile(absolutePath: string, relativePath: string, stat: fs.
     lastModified: stat.mtime.toISOString(),
     fileSize: stat.size,
     mimeType: getMimeType(ext),
+    visibility, // Include visibility in initial creation
   };
 
   // Extract additional metadata
@@ -228,6 +234,10 @@ function generateCacheKey(options: MediaQueryOptions, includeHidden: boolean): s
     limit: options.limit || 50,
     includeHidden,
     visibilityHash,
+    sortBy: options.sortBy,
+    sortOrder: options.sortOrder,
+    search: options.search,
+    tags: options.tags,
   });
 }
 
@@ -399,5 +409,17 @@ export async function GET(req: NextRequest) {
       error: 'Failed to process media directory',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
+  }
+}
+
+export function invalidateDirectoryCache(path?: string) {
+  if (path) {
+    for (const key of Array.from(directoryCache.keys())) {
+      if (key.includes(path)) {
+        directoryCache.delete(key);
+      }
+    }
+  } else {
+    directoryCache.clear();
   }
 }
