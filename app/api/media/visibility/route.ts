@@ -7,6 +7,7 @@ import {
   getHiddenFiles,
   clearVisibilityDb 
 } from '@/shared/utils/visibilityDb';
+import { invalidateDirectoryCache } from '../route';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Missing path or visibility' }, { status: 400 });
         }
         setFileVisibility(path, visibility);
+        invalidateDirectoryCache(path);
         return NextResponse.json({ success: true, path, visibility });
 
       case 'toggle':
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Missing path' }, { status: 400 });
         }
         const newVisibility = toggleFileVisibility(path);
+        invalidateDirectoryCache(path);
         return NextResponse.json({ success: true, path, visibility: newVisibility });
 
       case 'batch':
@@ -58,10 +61,12 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Missing or invalid updates' }, { status: 400 });
         }
         batchUpdateVisibility(updates);
+        invalidateDirectoryCache();
         return NextResponse.json({ success: true, updatedCount: Object.keys(updates).length });
 
       case 'clear':
         clearVisibilityDb();
+        invalidateDirectoryCache();
         return NextResponse.json({ success: true, message: 'All files set to visible' });
 
       default:
