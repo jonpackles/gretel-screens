@@ -1,10 +1,5 @@
 import { ScreenId } from '@/types';
-
-export interface ModeSequenceItem {
-  mode: string;
-  duration?: number;
-  mediaPath?: string;
-}
+import { ModeSequenceItem } from '../types';
 
 export interface ModeConfig {
   component: React.ComponentType<any>;

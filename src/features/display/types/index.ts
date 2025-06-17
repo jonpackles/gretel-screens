@@ -27,5 +27,11 @@ export interface ModeMetrics {
 }
 
 // Re-export from services for convenience
-export type { ModeSequenceItem, ModeConfig } from '../services/sequenceService';
-export type { ModeComponent, ModeRegistryKey } from '../modes'; 
+export type { ModeConfig } from '../services/sequenceService';
+export type { ModeComponent, ModeRegistryKey } from '../modes';
+
+export interface ModeSequenceItem {
+  mode: string;
+  duration?: number;
+  mediaPath?: string;
+} 

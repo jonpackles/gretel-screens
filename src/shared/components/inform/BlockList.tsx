@@ -16,9 +16,9 @@ export default function BlockList({ content }: Props) {
     <div className="block-list">
       {content.map((block) => (
         <div key={block.id} className={styles.block}>
-          <Block type={block.type} data={block.data} />
+          <Block type={block.type} data={block.data} internal={block.internal ?? false} />
         </div>
-        ))}
+      ))}
     </div>
   );
 }

@@ -44,8 +44,8 @@ export default function MediaDisplay({
     <Image
       src={`/content/${item.path}`}
       alt={item.name}
-      width={item.width}
-      height={item.height}
+      width={item.dimensions?.width ?? 0}
+      height={item.dimensions?.height ?? 0}
       className={className}
     />
   );
