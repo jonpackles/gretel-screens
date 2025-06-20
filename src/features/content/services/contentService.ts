@@ -1,4 +1,5 @@
 import { FileItem } from '../types';
+import { MediaService } from '@/features/display/services/mediaService';
 
 export class ContentService {
   static async fetchProjects(): Promise<FileItem[]> {
@@ -46,20 +47,46 @@ export class ContentService {
     }
   }
 
-  static async toggleFileVisibility(filePath: string): Promise<'visible' | 'hidden'> {
+  static async setFileVisibility(path: string, visibility: 'visible' | 'hidden'): Promise<void> {
     try {
       const res = await fetch('/api/media/visibility', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'toggle', path: filePath })
+        body: JSON.stringify({ action: 'set', path, visibility })
       });
       const data = await res.json();
-      if (data.success) {
-        return data.visibility;
+      if (!data.success) {
+        throw new Error('Failed to update visibility');
       }
-      throw new Error('Failed to toggle visibility');
+      
+      // Clear MediaService cache for the project path
+      const projectPath = path.split('/').slice(0, -1).join('/');
+      MediaService.clearCache([projectPath]);
     } catch (error) {
-      console.error('Error toggling file visibility:', error);
+      console.error('Error updating visibility:', error);
+      throw error;
+    }
+  }
+
+  static async toggleFileVisibility(path: string): Promise<'visible' | 'hidden'> {
+    try {
+      const res = await fetch('/api/media/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle', path })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error('Failed to toggle visibility');
+      }
+      
+      // Clear MediaService cache for the project path
+      const projectPath = path.split('/').slice(0, -1).join('/');
+      MediaService.clearCache([projectPath]);
+      
+      return data.visibility;
+    } catch (error) {
+      console.error('Error toggling visibility:', error);
       throw error;
     }
   }
@@ -75,6 +102,9 @@ export class ContentService {
       if (!data.success) {
         throw new Error('Failed to update visibility');
       }
+      
+      // Clear MediaService cache to ensure immediate updates
+      MediaService.clearCache();
     } catch (error) {
       console.error('Error updating visibility:', error);
       throw error;
@@ -103,6 +133,26 @@ export class ContentService {
     } catch (error) {
       console.error('Error fetching all project media:', error);
       return [];
+    }
+  }
+
+  static async clearVisibilityDb(): Promise<void> {
+    try {
+      const res = await fetch('/api/media/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear' })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error('Failed to clear visibility database');
+      }
+      
+      // Clear all MediaService cache
+      MediaService.clearCache();
+    } catch (error) {
+      console.error('Error clearing visibility database:', error);
+      throw error;
     }
   }
 } 

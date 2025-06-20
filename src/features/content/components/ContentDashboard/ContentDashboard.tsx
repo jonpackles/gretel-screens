@@ -30,7 +30,7 @@ export function ContentDashboard() {
     setSelectedProject(project);
     setPendingVisibilityChanges({});
     setCurrentPage(1);
-    const { items, pagination } = await ContentService.fetchProjectMedia(project.path);
+    const { items, pagination } = await ContentService.fetchProjectMedia(project.path, true);
     console.log('Media files loaded for project:', items.length, items.slice(0, 3));
     setMedia(items);
     setHasMore(pagination.hasMore);
@@ -73,6 +73,8 @@ export function ContentDashboard() {
       await ContentService.batchUpdateVisibility(pendingVisibilityChanges);
       setPendingVisibilityChanges({});
       if (selectedProject) {
+        // Small delay to ensure server-side cache invalidation has completed
+        await new Promise(resolve => setTimeout(resolve, 100));
         // Refresh project data to get updated visibility states
         const { items } = await ContentService.fetchProjectMedia(selectedProject.path, true);
         setMedia(items);

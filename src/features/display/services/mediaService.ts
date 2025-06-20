@@ -261,11 +261,18 @@ export class MediaService {
   }
 
   /**
-   * Clear all caches
+   * Clear cache for specific paths or all cache
    */
-  static clearCache(): void {
-    this.cache = {};
-    console.log('MediaService: Cache cleared');
+  static clearCache(paths?: string[]): void {
+    if (paths) {
+      paths.forEach(path => {
+        delete this.cache[path];
+      });
+      console.log(`MediaService: Cleared cache for ${paths.length} paths`);
+    } else {
+      this.cache = {};
+      console.log('MediaService: Cleared all cache');
+    }
   }
 
   /**

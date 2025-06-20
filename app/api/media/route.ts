@@ -18,6 +18,9 @@ const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', 
 const directoryCache = new Map<string, { items: MediaItem[]; timestamp: number; etag: string }>();
 const DIRECTORY_CACHE_TTL = 1000 * 60 * 1; // 5 minutes
 
+// Track when visibility was last updated to force cache refresh
+let lastVisibilityUpdate = 0;
+
 /**
  * Check if file should be included based on filters
  */
@@ -234,6 +237,7 @@ function generateCacheKey(options: MediaQueryOptions, includeHidden: boolean): s
     limit: options.limit || 50,
     includeHidden,
     visibilityHash,
+    lastVisibilityUpdate, // Include visibility update timestamp
     sortBy: options.sortBy,
     sortOrder: options.sortOrder,
     search: options.search,
@@ -310,7 +314,7 @@ export async function GET(req: NextRequest) {
           status: 304,
           headers: {
             'ETag': responseETag,
-            'Cache-Control': 'public, max-age=300', // 5 minutes
+            'Cache-Control': 'public, max-age=30', // 30 seconds for faster updates
           }
         });
       }
@@ -342,7 +346,7 @@ export async function GET(req: NextRequest) {
           status: 304,
           headers: {
             'ETag': responseETag,
-            'Cache-Control': 'public, max-age=300',
+            'Cache-Control': 'public, max-age=30', // 30 seconds for faster updates
           }
         });
       }
@@ -398,7 +402,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(response, {
       headers: {
         'ETag': responseETag,
-        'Cache-Control': 'public, max-age=300', // 5 minutes
+        'Cache-Control': 'public, max-age=30', // 30 seconds for faster updates
         'Last-Modified': new Date().toUTCString(),
       },
     });
@@ -413,12 +417,12 @@ export async function GET(req: NextRequest) {
 }
 
 export function invalidateDirectoryCache(path?: string) {
+  // Update the visibility update timestamp to force cache refresh
+  lastVisibilityUpdate = Date.now();
+  
   if (path) {
-    for (const key of Array.from(directoryCache.keys())) {
-      if (key.includes(path)) {
-        directoryCache.delete(key);
-      }
-    }
+    // Clear all cache entries since visibility changes affect all queries
+    directoryCache.clear();
   } else {
     directoryCache.clear();
   }
