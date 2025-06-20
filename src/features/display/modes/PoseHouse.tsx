@@ -240,7 +240,7 @@ export default function PoseHouse({}: PoseHouseProps) {
         ref={videoRef}
         style={{ 
           position: 'fixed',
-          top: 10,
+          bottom: 10,
           right: 10,
           width: 160,
           height: 120,

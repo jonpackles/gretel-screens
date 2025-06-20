@@ -12,6 +12,7 @@ import PoseHouse from '../../modes/PoseHouse';
 import Inform from '../../modes/Inform';
 import Grid from '../../modes/Grid';
 import Paths from '../../modes/Paths';
+import Mosaic from '../../modes/Mosaic';
 
 // Import inform sub-modes
 import InformCalendar from '../../modes/inform/Calendar';
@@ -84,6 +85,12 @@ const MODE_CONFIGS: ModeConfig[] = [
     component: Paths,
     name: 'Paths',
     duration: 30000, // 30 seconds
+    mediaPath: 'linked-content/projects',
+  },
+  {
+    component: Mosaic,
+    name: 'Mosaic',
+    duration: 40000, // 40 seconds
     mediaPath: 'linked-content/projects',
   },
   // Add inform sub-modes

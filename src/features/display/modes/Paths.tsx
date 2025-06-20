@@ -7,8 +7,8 @@ const SHAPES = ["house", "sine", "infinity", "circle"] as const;
 type ShapeName = typeof SHAPES[number];
 const STEP_MS = 100; // Speed of animation (ms per step)
 const PAUSE_MS = 3000; // Pause at end of shape (ms)
-const VIDEO_SIZE = 300;
-const VIDEO_SPACING = 100;
+const VIDEO_SIZE = 220;
+const VIDEO_SPACING = 120;
 
 function getShapePath(shape: ShapeName, count: number): { x: number; y: number }[] {
   switch (shape) {
