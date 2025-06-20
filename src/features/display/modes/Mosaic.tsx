@@ -73,7 +73,7 @@ export default function Mosaic({ media }: MosaicProps) {
     if (!media.length) return;
     const interval = setInterval(() => {
       setCurrentMediaIndex(prev => (prev + 1) % media.length);
-    }, 5000);
+    }, 20000);
     return () => clearInterval(interval);
   }, [media.length]);
 
@@ -443,3 +443,34 @@ export default function Mosaic({ media }: MosaicProps) {
     </>
   );
 }
+
+// Add static preload method to Mosaic
+Mosaic.preload = async function(media: MediaItem[] = []) {
+  if (!media?.length) return;
+  
+  // Preload all media items since Mosaic cycles through them
+  const preloaders = media.map(item => {
+    const src = `/content/${item.path}`;
+    if (/\.(mp4|webm|ogg)$/i.test(item.name)) {
+      // Preload video
+      return new Promise(resolve => {
+        const video = document.createElement('video');
+        video.src = src;
+        video.preload = 'auto';
+        video.muted = true;
+        video.oncanplaythrough = () => resolve(true);
+        video.onerror = () => resolve(false);
+      });
+    } else {
+      // Preload image
+      return new Promise(resolve => {
+        const img = new window.Image();
+        img.src = src;
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+      });
+    }
+  });
+  
+  await Promise.all(preloaders);
+};
