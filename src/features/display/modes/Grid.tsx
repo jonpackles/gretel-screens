@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { MediaItem } from '@/shared/types/media';
 import styles from './modes.module.scss';
+import { basel, quadrant, droulers } from '@/styles/fonts';
 
 const GRID_COLS = 7;
 const GRID_ROWS = 14; // 7 x 14 = 98
@@ -223,6 +224,7 @@ export default function Grid({ media }: GridProps) {
                   className={`grid-item ${isVisible ? 'visible' : ''}`}
                   style={{
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     width: '100%',
@@ -254,6 +256,20 @@ export default function Grid({ media }: GridProps) {
                       }}
                     />
                   )}
+                  <h4
+                    className={basel.className}
+                    style={{
+                      color: 'lightgray',
+                      fontSize: '7px',
+                      marginTop: '10px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {item.name.length > 35 
+                      ? `${item.name.substring(0, 20)}${item.name.substring(item.name.lastIndexOf('.'))}`
+                      : item.name
+                    }
+                  </h4>
                 </div>
               );
             })}
