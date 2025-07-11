@@ -1,3 +1,6 @@
+$bg-colors:  #FFFEE1, #D4F6FA, #E6EBF7, #E4FAD8, #F0DFD7, #ECE2EE, #FFE0B5,  #D4C6AB, #D9D9D9, #FBD1CB;
+$bg-color-ct: length($bg-colors);
+
 :root {
   /* Hide scrollbar for Chrome, Safari and Opera */
   &::-webkit-scrollbar {
@@ -161,8 +164,13 @@
 
   // Internal vs External styling
   &--internal {
-    background-color: #fff;
+    // background-color: #fff;
     color: #000;
+    @for $i from 1 through length($bg-colors) {
+      &:nth-of-type(#{$i}) {
+        background-color: nth($bg-colors, $i);
+      }
+    }
     
 
     h1 {
