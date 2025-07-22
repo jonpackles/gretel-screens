@@ -1,4 +1,5 @@
 // Shared hooks
-export { useKeyboard } from './useKeyboard';
-export { useContainerSize } from './useContainerSize';
-export { usePoseDetection } from './usePoseDetection'; 
+export * from './useKeyboard';
+export * from './useContainerSize';
+export * from './usePoseDetection';
+export * from './useInformContent'; 

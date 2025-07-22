@@ -36,6 +36,7 @@ export function usePoseDetection(): UsePoseDetectionReturn {
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const detectionActiveRef = useRef(false);
   const detectionLoopRef = useRef<number | null>(null);
+  const cameraTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const initCamera = useCallback(async () => {
     try {
@@ -47,6 +48,12 @@ export function usePoseDetection(): UsePoseDetectionReturn {
         console.log('usePoseDetection: Stopping existing camera stream');
         cameraStreamRef.current.getTracks().forEach(track => track.stop());
         cameraStreamRef.current = null;
+      }
+      
+      // Clear any existing timeout
+      if (cameraTimeoutRef.current) {
+        clearTimeout(cameraTimeoutRef.current);
+        cameraTimeoutRef.current = null;
       }
       
       console.log('usePoseDetection: Requesting getUserMedia...');
@@ -65,29 +72,105 @@ export function usePoseDetection(): UsePoseDetectionReturn {
         videoRef.current.srcObject = stream;
         cameraStreamRef.current = stream;
         
-        // Wait for video to be ready
+        // Wait for video to be ready with polling approach
         console.log('usePoseDetection: Waiting for video to be ready...');
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            console.error('usePoseDetection: Camera timeout - video not ready');
-            setDebugInfo('Camera timeout - video not ready');
-            reject(new Error('Camera timeout'));
-          }, 10000); // Increased timeout to 10 seconds
+        const startTime = Date.now();
+        const maxWaitTime = 10000; // 10 seconds
+        
+        const checkVideoReady = (): boolean => {
+          const video = videoRef.current!;
+          const isReady = video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0;
           
-          videoRef.current!.onloadeddata = () => {
-            clearTimeout(timeout);
-            console.log('usePoseDetection: Camera loaded', videoRef.current!.videoWidth, 'x', videoRef.current!.videoHeight);
-            setDebugInfo('Camera loaded successfully');
-            resolve(true);
-          };
+          console.log('usePoseDetection: Video check -', {
+            readyState: video.readyState,
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            isReady
+          });
           
-          videoRef.current!.onerror = (e) => {
-            clearTimeout(timeout);
-            console.error('usePoseDetection: Video error:', e);
-            setDebugInfo('Camera error');
-            reject(e);
-          };
-        });
+          return isReady;
+        };
+        
+        // Immediate check
+        if (checkVideoReady()) {
+          console.log('usePoseDetection: Video already ready');
+          setDebugInfo('Camera loaded successfully');
+        } else {
+          // Poll for readiness
+          await new Promise((resolve, reject) => {
+            let isResolved = false;
+            let pollInterval: NodeJS.Timeout;
+            
+            // Event listeners as additional triggers
+            const onVideoEvent = () => {
+              if (isResolved) return;
+              
+              if (checkVideoReady()) {
+                console.log('usePoseDetection: Video ready via event');
+                setDebugInfo('Camera loaded successfully');
+                resolveOnce(true);
+              }
+            };
+            
+            const cleanup = () => {
+              if (pollInterval) clearInterval(pollInterval);
+              if (cameraTimeoutRef.current) {
+                clearTimeout(cameraTimeoutRef.current);
+                cameraTimeoutRef.current = null;
+              }
+              // Remove event listeners
+              if (videoRef.current) {
+                videoRef.current.removeEventListener('loadeddata', onVideoEvent);
+                videoRef.current.removeEventListener('canplay', onVideoEvent);
+                videoRef.current.removeEventListener('loadedmetadata', onVideoEvent);
+              }
+            };
+            
+            const resolveOnce = (result: any) => {
+              if (!isResolved) {
+                console.log('usePoseDetection: resolveOnce called, cleaning up...');
+                isResolved = true;
+                cleanup();
+                resolve(result);
+              } else {
+                console.log('usePoseDetection: resolveOnce called but already resolved');
+              }
+            };
+            
+            const rejectOnce = (error: any) => {
+              if (!isResolved) {
+                console.log('usePoseDetection: rejectOnce called, cleaning up...');
+                isResolved = true;
+                cleanup();
+                reject(error);
+              } else {
+                console.log('usePoseDetection: rejectOnce called but already resolved');
+              }
+            };
+            
+            // Start polling - this handles both success and timeout cases
+            pollInterval = setInterval(() => {
+              if (isResolved) return;
+              
+              const elapsed = Date.now() - startTime;
+              
+              if (checkVideoReady()) {
+                console.log('usePoseDetection: Video became ready after', elapsed, 'ms');
+                setDebugInfo('Camera loaded successfully');
+                resolveOnce(true);
+              } else if (elapsed > maxWaitTime) {
+                console.error('usePoseDetection: Video timeout after', elapsed, 'ms');
+                setDebugInfo('Camera timeout - video not ready');
+                rejectOnce(new Error('Camera timeout'));
+              }
+            }, 100); // Check every 100ms
+            
+            // Set up event listeners
+            videoRef.current!.addEventListener('loadeddata', onVideoEvent);
+            videoRef.current!.addEventListener('canplay', onVideoEvent);
+            videoRef.current!.addEventListener('loadedmetadata', onVideoEvent);
+          });
+        }
         
         // Ensure video is playing
         try {
@@ -243,6 +326,12 @@ export function usePoseDetection(): UsePoseDetectionReturn {
     if (detectionLoopRef.current) {
       cancelAnimationFrame(detectionLoopRef.current);
       detectionLoopRef.current = null;
+    }
+    
+    // Clear camera timeout if it's still running
+    if (cameraTimeoutRef.current) {
+      clearTimeout(cameraTimeoutRef.current);
+      cameraTimeoutRef.current = null;
     }
     
     if (cameraStreamRef.current) {

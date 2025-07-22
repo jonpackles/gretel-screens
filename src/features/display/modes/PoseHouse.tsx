@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
-import { usePoseDetection } from '@/app/hooks/usePoseDetection';
+import { usePoseDetection } from '@/shared/hooks/usePoseDetection';
 import styles from './modes.module.scss';
 
 type Point = { x: number; y: number };

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useRef, useLayoutEffect } from 'react';
 import { basel, quadrant, droulers } from '@/styles/fonts';
 import Block from '@/shared/components/inform/Block';
 import styles from '../modes.module.scss';
 import '@/styles/inform/inform.scss';
+import { useInformContent } from '@/shared/hooks/useInformContent';
 
 let calendarCache: any[] | null = null;
 
@@ -19,37 +20,16 @@ export async function preload() {
 }
 
 export default function Calendar() {
-  const [content, setContent] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { content, loading, error } = useInformContent({
+    filterType: 'event',
+    pollInterval: 60000, // Poll every minute
+    enableBroadcast: true
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const blockRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollY = useRef(0);
   const pendingScrollReset = useRef<number | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/api/inform');
-        if (!response.ok) {
-          throw new Error('Failed to fetch data');
-        }
-        const data = await response.json();
-        
-        // Filter to only show events and announcements (no projects)
-        const eventsOnly = data.filter((item: any) => 
-          item.type === 'event' || item.type === 'announcement'
-        );
-        
-        setContent(eventsOnly);
-      } catch (error) {
-        console.error('Failed to fetch inform content:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    fetchData();
-  }, []);
 
   // Animation loop for seamless upward scrolling
   useEffect(() => {
@@ -92,10 +72,18 @@ export default function Calendar() {
     }
   }, [content]);
 
-  if (loading) {
+  if (loading && content.length === 0) {
     return (
       <div className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`} id="inform">
         <div>Loading calendar events...</div>
+      </div>
+    );
+  }
+
+  if (error && content.length === 0) {
+    return (
+      <div className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`} id="inform">
+        <div>Error loading calendar events: {error}</div>
       </div>
     );
   }
