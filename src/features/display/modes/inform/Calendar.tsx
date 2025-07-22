@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useLayoutEffect } from 'react';
+import { useRef, useLayoutEffect, useEffect } from 'react';
 import { basel, quadrant, droulers } from '@/styles/fonts';
 import Block from '@/shared/components/inform/Block';
 import styles from '../modes.module.scss';
