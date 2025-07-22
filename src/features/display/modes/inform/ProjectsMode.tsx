@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { basel, quadrant, droulers } from '@/styles/fonts';
 import ProjectBlock from '@/shared/components/inform/blocks/ProjectBlock';
 import styles from '../modes.module.scss';
 import '@/styles/inform/inform.scss';
+import { useInformContent } from '@/shared/hooks/useInformContent';
 
 let projectsCache: any[] | null = null;
 
@@ -52,35 +53,14 @@ function ProjectPosterBlock({ data, internal }: { data: any; internal: boolean }
 }
 
 export default function ProjectsMode() {
-  const [content, setContent] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { content, loading, error } = useInformContent({
+    filterType: 'project',
+    pollInterval: 60000, // Poll every minute
+    enableBroadcast: true
+  });
+
   const [currentProjectIndex, setCurrentProjectIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/api/inform');
-        if (!response.ok) {
-          throw new Error('Failed to fetch data');
-        }
-        const data = await response.json();
-        
-        // Filter to only show projects
-        const projectsOnly = data.filter((item: any) => 
-          item.type === 'project'
-        );
-        
-        setContent(projectsOnly);
-      } catch (error) {
-        console.error('Failed to fetch inform content:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    fetchData();
-  }, []);
 
   // Auto-scroll through projects every 20 seconds
   useEffect(() => {
@@ -123,10 +103,18 @@ export default function ProjectsMode() {
     }
   }, [content, currentProjectIndex]);
 
-  if (loading) {
+  if (loading && content.length === 0) {
     return (
       <div className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`} id="inform">
         <div>Loading projects...</div>
+      </div>
+    );
+  }
+
+  if (error && content.length === 0) {
+    return (
+      <div className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`} id="inform">
+        <div>Error loading projects: {error}</div>
       </div>
     );
   }

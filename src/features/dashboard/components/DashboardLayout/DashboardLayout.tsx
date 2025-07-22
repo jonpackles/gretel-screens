@@ -14,6 +14,11 @@ const navItems: DashboardNavItem[] = [
     name: 'Sequences',
     href: '/dashboard/sequences',
     description: 'Configure screen sequences'
+  },
+  {
+    name: 'Inform',
+    href: '/dashboard/inform',
+    description: 'Monitor Google Calendar & Sheets data'
   }
 ];
 
