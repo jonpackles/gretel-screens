@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useLayoutEffect, useEffect } from 'react';
+import { useRef, useLayoutEffect, useEffect, useState } from 'react';
 import { basel, quadrant, droulers } from '@/styles/fonts';
 import Block from '@/shared/components/inform/Block';
 import styles from '../modes.module.scss';
@@ -10,6 +10,9 @@ import { useInformContent } from '@/shared/hooks/useInformContent';
 let calendarCache: any[] | null = null;
 
 export async function preload() {
+  // Clear cache to force fresh data
+  calendarCache = null;
+  
   if (!calendarCache) {
     const response = await fetch('/api/inform');
     if (response.ok) {
@@ -20,20 +23,29 @@ export async function preload() {
 }
 
 export default function Calendar() {
-  const { content, loading, error } = useInformContent({
+  // Get real-time content from hook
+  const { content: sourceContent, loading, error } = useInformContent({
     filterType: 'event',
     pollInterval: 60000, // Poll every minute
     enableBroadcast: true
   });
+
+  // Local state for animation - this CAN be modified
+  const [animatedContent, setAnimatedContent] = useState<any[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const blockRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollY = useRef(0);
   const pendingScrollReset = useRef<number | null>(null);
 
+  // Sync animated content when source content changes (from API/broadcast)
+  useEffect(() => {
+    setAnimatedContent(sourceContent);
+  }, [sourceContent]);
+
   // Animation loop for seamless upward scrolling
   useEffect(() => {
-    if (content.length === 0) return;
+    if (animatedContent.length === 0) return;
     let animationFrame: number;
     let lastTimestamp = performance.now();
 
@@ -50,7 +62,8 @@ export default function Calendar() {
 
         // If the first block is fully out of view, rotate it to the end
         if (scrollY.current >= firstBlock.offsetHeight) {
-          setContent(prev => [...prev.slice(1), prev[0]]);
+          // ✅ Now we can modify the animated content
+          setAnimatedContent(prev => [...prev.slice(1), prev[0]]);
           pendingScrollReset.current = scrollY.current - firstBlock.offsetHeight;
           // Don't set scrollTop here! Wait for DOM update.
         }
@@ -61,7 +74,7 @@ export default function Calendar() {
 
     animationFrame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrame);
-  }, [content]);
+  }, [animatedContent]); // ✅ Use animatedContent instead of content
 
   // After content changes, reset scroll position if needed
   useLayoutEffect(() => {
@@ -70,9 +83,9 @@ export default function Calendar() {
       containerRef.current.scrollTop = scrollY.current;
       pendingScrollReset.current = null;
     }
-  }, [content]);
+  }, [animatedContent]); // ✅ Use animatedContent instead of content
 
-  if (loading && content.length === 0) {
+  if (loading && animatedContent.length === 0) {
     return (
       <div className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`} id="inform">
         <div>Loading calendar events...</div>
@@ -80,7 +93,7 @@ export default function Calendar() {
     );
   }
 
-  if (error && content.length === 0) {
+  if (error && animatedContent.length === 0) {
     return (
       <div className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`} id="inform">
         <div>Error loading calendar events: {error}</div>
@@ -88,7 +101,7 @@ export default function Calendar() {
     );
   }
 
-  if (content.length === 0) {
+  if (animatedContent.length === 0) {
     return (
       <div className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`} id="inform">
         <div>No calendar events available.</div>
@@ -103,7 +116,7 @@ export default function Calendar() {
       className={`${styles.modeContainer} ${basel.variable} ${quadrant.variable} ${droulers.variable}`}
       id="inform"
     >
-      {content.map((item, index) => (
+      {animatedContent.map((item, index) => (
         <div
           key={item.id || index}
           ref={el => { blockRefs.current[index] = el; }}

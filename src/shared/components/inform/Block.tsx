@@ -6,10 +6,12 @@ import ProjectBlock from "./blocks/ProjectBlock";
 
 // Format date to M/DD format
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const month = date.getMonth() + 1; // getMonth() returns 0-11
-  const day = date.getDate().toString().padStart(2, '0');
-  return `${month}/${day}`;
+  // Parse date string as local date to avoid timezone conversion issues
+  const [year, month, day] = dateString.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  const monthNum = date.getMonth() + 1; // getMonth() returns 0-11
+  const dayNum = date.getDate().toString().padStart(2, '0');
+  return `${monthNum}/${dayNum}`;
 }
 
 type Props = {

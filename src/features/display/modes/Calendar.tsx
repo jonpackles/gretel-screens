@@ -9,6 +9,9 @@ import '@/styles/inform/inform.scss';
 let calendarCache: any[] | null = null;
 
 export async function preload() {
+  // Clear cache to force fresh data
+  calendarCache = null;
+  
   if (!calendarCache) {
     const response = await fetch('/api/inform');
     if (response.ok) {

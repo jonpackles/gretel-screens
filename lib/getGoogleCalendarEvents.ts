@@ -41,6 +41,7 @@ export async function getGoogleCalendarEvents() {
       let time: string;
       const startTime = event.start?.dateTime ? new Date(event.start.dateTime) : (event.start?.date ? new Date(event.start.date) : undefined);
       const endTime = event.end?.dateTime ? new Date(event.end.dateTime) : (event.end?.date ? new Date(event.end.date) : undefined);
+      
       if (startTime && startTime.getHours() === 0 && startTime.getMinutes() === 0) {
         time = 'All Day';
       } else if (startTime && endTime && endTime.getTime() !== startTime.getTime()) {
@@ -71,7 +72,21 @@ export async function getGoogleCalendarEvents() {
         url,
         type,
         tag,
-        date: startTime ? startTime.toISOString().split('T')[0] : '',
+        date: (() => {
+          // For all-day events, use the date field directly
+          if (event.start?.date && !event.start?.dateTime) {
+            return event.start.date;
+          }
+          
+          // For timed events, extract date from the original dateTime string
+          if (event.start?.dateTime) {
+            // Extract YYYY-MM-DD from "2024-07-23T17:00:00-07:00"
+            return event.start.dateTime.split('T')[0];
+          }
+          
+          // Fallback to converted date if needed
+          return startTime ? startTime.toISOString().split('T')[0] : '';
+        })(),
         time,
         location,
         imageUrl,

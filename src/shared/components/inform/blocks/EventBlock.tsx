@@ -46,7 +46,12 @@ export default function EventBlock({ data, mode, formatDate }: Props) {
       </div>
       
       <div className="info">
-        {data.date && <div className="date">{new Date(data.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>}
+        {data.date && <div className="date">{(() => {
+          // Parse date string as local date to avoid timezone conversion issues
+          const [year, month, day] = data.date.split('-');
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        })()}</div>}
         {data.time && <div className="time">{data.time}</div>}
         {data.location && (
           
