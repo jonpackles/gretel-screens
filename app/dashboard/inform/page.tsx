@@ -88,6 +88,8 @@ export default function InformMonitor() {
       url: item.data.url || '',
       team: item.data.team ? item.data.team.join(', ') : '',
       status: item.data.status || '',
+      imageUrl: item.data.imageUrl || '',
+      endDate: item.data.endDate || '',
     });
   };
 
@@ -460,11 +462,20 @@ export default function InformMonitor() {
                       ) : (
                         <>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                             <input
                               type="date"
                               value={editForm.date || ''}
                               onChange={(e) => setEditForm({...editForm, date: e.target.value})}
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">End Date (optional)</label>
+                            <input
+                              type="date"
+                              value={editForm.endDate || ''}
+                              onChange={(e) => setEditForm({...editForm, endDate: e.target.value})}
                               className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                             />
                           </div>
@@ -508,6 +519,64 @@ export default function InformMonitor() {
                       )}
                     </div>
                     
+                    {/* Image Upload Section */}
+                    {item.type !== 'project' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Event Image</label>
+                        <div className="space-y-2">
+                          {/* Current Image Display */}
+                          {(editForm.imageUrl || item.data.imageUrl) && (
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src={editForm.imageUrl || item.data.imageUrl} 
+                                alt="Event" 
+                                className="w-16 h-16 object-cover rounded border"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setEditForm({...editForm, imageUrl: ''})}
+                                className="px-2 py-1 bg-red-100 text-red-800 hover:bg-red-200 rounded text-xs"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Upload Input */}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              
+                              const formData = new FormData();
+                              formData.append('image', file);
+                              formData.append('contentId', item.id);
+                              
+                              try {
+                                const res = await fetch('/api/inform/image-upload', {
+                                  method: 'POST',
+                                  body: formData
+                                });
+                                
+                                if (res.ok) {
+                                  const { imageUrl } = await res.json();
+                                  setEditForm({...editForm, imageUrl});
+                                } else {
+                                  const error = await res.json();
+                                  alert(`Failed to upload image: ${error.error}`);
+                                }
+                              } catch (error) {
+                                alert('Upload error: ' + error);
+                              }
+                            }}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         {item.type === 'announcement' ? 'Body' : 'Description'}
@@ -550,13 +619,23 @@ export default function InformMonitor() {
                     <div className="space-y-2">
                       {item.data.date && (
                         <div className="text-sm text-gray-600">
-                          <span className="font-medium">Date:</span> {item.data.date}
-                          {item.data.time && <span className="ml-2">{item.data.time}</span>}
+                          <span className="font-medium">Date:</span> {
+                            item.data.endDate && item.data.endDate !== item.data.date
+                              ? `${item.data.date} - ${item.data.endDate}`
+                              : item.data.date
+                          }
+                          {item.data.time && !(item.data.endDate && item.data.endDate !== item.data.date) && <span className="ml-2">{item.data.time}</span>}
                         </div>
                       )}
                       {item.data.location && (
                         <div className="text-sm text-gray-600">
                           <span className="font-medium">Location:</span> {item.data.location}
+                        </div>
+                      )}
+                      {item.data.imageUrl && (
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">Image:</span>
+                          <img src={item.data.imageUrl} alt="Event" className="mt-1 w-20 h-20 object-cover rounded border" />
                         </div>
                       )}
                       {(item.data.description || item.data.body) && (

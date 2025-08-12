@@ -20,6 +20,7 @@ function convertEventsToContentBlocks(events: any[]): ContentBlock[] {
       data: {
         title: event.title,
         date: event.date, // Already in YYYY-MM-DD format from your processCalendarEvent
+        endDate: event.endDate, // End date for multi-day events
         time: event.time, // Already formatted from your processCalendarEvent
         location: event.location,
         description: isAnnouncement ? undefined : event.description, // Events get description

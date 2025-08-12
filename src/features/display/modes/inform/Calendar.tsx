@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useLayoutEffect } from 'react';
+import { useRef, useLayoutEffect, useEffect, useState } from 'react';
 import { basel, quadrant, droulers } from '@/styles/fonts';
 import Block from '@/shared/components/inform/Block';
 import styles from '../modes.module.scss';
@@ -20,16 +20,24 @@ export async function preload() {
 }
 
 export default function Calendar() {
-  const { content, loading, error } = useInformContent({
+  const { content: sourceContent, loading, error } = useInformContent({
     filterType: 'event',
     pollInterval: 60000, // Poll every minute
     enableBroadcast: true
   });
 
+  // Local state for animation rotation
+  const [content, setContent] = useState<any[]>([]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const blockRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollY = useRef(0);
   const pendingScrollReset = useRef<number | null>(null);
+
+  // Update local content when source content changes
+  useEffect(() => {
+    setContent(sourceContent);
+  }, [sourceContent]);
 
   // Animation loop for seamless upward scrolling
   useEffect(() => {

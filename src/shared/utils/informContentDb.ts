@@ -10,12 +10,14 @@ export interface InformContentOverride {
     description?: string;
     body?: string;
     date?: string;
+    endDate?: string;
     time?: string;
     location?: string;
     tag?: string;
     url?: string;
     team?: string[];
     status?: string;
+    imageUrl?: string;
   };
   visibility: 'visible' | 'hidden';
   lastModified: string;
