@@ -27,7 +27,7 @@ export class ContentService {
     try {
       const cacheBuster = bustCache ? `&_t=${Date.now()}` : '';
       const res = await fetch(
-        `/api/media?path=${encodeURIComponent(projectPath)}&recursive=true&includeHidden=true&page=${page}&limit=${limit}${cacheBuster}`
+        `/api/media?path=${encodeURIComponent(projectPath)}&recursive=true&includeHidden=true&dashboard=true&page=${page}&limit=${limit}${cacheBuster}`
       );
       const data = await res.json();
       const mediaFiles = data.items?.filter((item: FileItem) =>

@@ -34,6 +34,11 @@ export type MediaItem = {
   
   // Visibility control (Option B)
   visibility?: 'visible' | 'hidden'; // Replaces filename-based hiding
+  
+  // Variant support
+  variantSize?: 'original' | 'sm' | 'md' | 'lg' | 'xl' | 'small' | 'medium' | 'large' | 'thumb';
+  basePath?: string; // Path to the base file (for variants)
+  isVariant?: boolean; // Whether this file is a variant
 };
 
 // API response types

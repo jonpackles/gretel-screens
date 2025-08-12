@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { MediaItem } from '@/shared/types/media';
 import { useKeyboard } from '@/shared/hooks/useKeyboard';
+import { 
+  groupFileVariants, 
+  selectOptimalVariant, 
+  selectSpecificVariant,
+  DisplayContext 
+} from '@/shared/utils/variantUtils';
 
 // Import all available modes from the new structure
 import Slideshow from '../../modes/Slideshow';
@@ -34,6 +40,7 @@ interface ModeConfig {
   name: string;
   duration: number; // Duration in milliseconds
   mediaPath: string | undefined; // Always present, can be undefined
+  variantSize?: 'original' | 'sm' | 'md' | 'lg' | 'xl' | 'small' | 'medium' | 'large' | 'thumb'; // Preferred variant size
   props?: any; // Additional props for the mode
 }
 
@@ -42,6 +49,7 @@ export type ModeSequenceItem = {
   mode: string;
   duration?: number;
   mediaPath?: string;
+  variantSize?: 'original' | 'sm' | 'md' | 'lg' | 'xl' | 'small' | 'medium' | 'large' | 'thumb';
 };
 
 const MODE_CONFIGS: ModeConfig[] = [
@@ -50,12 +58,14 @@ const MODE_CONFIGS: ModeConfig[] = [
     name: 'Slideshow',
     duration: 10000, 
     mediaPath: 'linked-content/projects',
+    variantSize: 'original', // Full resolution for 4K TV display
   },
   {
     component: VerticalCarousel,
     name: 'Vertical Carousel',
     duration: 5000,
     mediaPath: 'linked-content/posters',
+    variantSize: 'md', // Medium for carousel items
   },
   {
     component: Calendar,
@@ -80,18 +90,21 @@ const MODE_CONFIGS: ModeConfig[] = [
     name: 'Grid',
     duration: 30000, // 30 seconds
     mediaPath: 'linked-content/projects',
+    variantSize: 'sm', // Small for performance with many grid items
   },
   {
     component: Paths,
     name: 'Paths',
     duration: 30000, // 30 seconds
     mediaPath: 'linked-content/projects',
+    variantSize: 'md', // Medium for path animations
   },
   {
     component: Mosaic,
     name: 'Mosaic',
     duration: 40000, // 40 seconds
     mediaPath: 'linked-content/projects',
+    variantSize: 'md', // Medium for mosaic layout
   },
   // Add inform sub-modes
   {
@@ -149,9 +162,10 @@ export default function ModeManager({
           ...base,
           duration: item.duration ?? base.duration,
           mediaPath: item.mediaPath ?? base.mediaPath,
+          variantSize: item.variantSize ?? base.variantSize,
         };
       })
-      .filter((m): m is ModeConfig => !!m);
+      .filter((m): m is ModeConfig => m !== null);
   }, [sequence]);
 
   const currentMode = activeModes[currentModeIndex];
@@ -190,22 +204,53 @@ export default function ModeManager({
         await Promise.all(
           mediaPaths.map(async (path) => {
             console.log(`ModeManager: Fetching media from ${path}`);
+            // Fetch ALL files including variants for smart selection
             const res = await fetch(`/api/media?path=${path}&recursive=true&limit=10000&includeHidden=false`);
             const data = await res.json();
             
-            const files = (data.items?.filter((item: MediaItem) =>
+            const allFiles = (data.items?.filter((item: MediaItem) =>
               item.type === 'file' && 
               /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name)
             ) || []);
 
-            console.log(`ModeManager: Found ${files.length} files in ${path}`);
-            // Store unshuffled media - we'll shuffle fresh each time
-            mediaCache[path] = files;
+            console.log(`ModeManager: Found ${allFiles.length} total files in ${path}`);
+            
+            // Group files by variants and select mode-specific versions
+            const variantGroups = groupFileVariants(allFiles);
+            console.log(`ModeManager: Grouped into ${variantGroups.length} variant groups`);
+            
+            // Find the mode that uses this media path to get its variant preference
+            const modeForPath = activeModes.find(mode => mode.mediaPath === path);
+            const preferredSize = modeForPath?.variantSize;
+            
+            // Select variants based on mode preference
+            const optimizedFiles = variantGroups.map(group => {
+              let selectedVariant;
+              
+                             if (preferredSize) {
+                 // Use mode-specific variant size
+                 selectedVariant = selectSpecificVariant(group, preferredSize);
+                 console.log(`ModeManager: Selected ${selectedVariant.size} variant (mode preference: ${preferredSize}) for ${group.baseName}`);
+               } else {
+                 // Fall back to auto-selection if no preference set
+                 const displayContext: DisplayContext = {
+                   bandwidth: 'high',
+                   purpose: 'display'
+                 };
+                 selectedVariant = selectOptimalVariant(group, displayContext);
+                 console.log(`ModeManager: Selected ${selectedVariant.size} variant (auto) for ${group.baseName}`);
+               }
+              
+              return selectedVariant.mediaItem;
+            });
+
+            console.log(`ModeManager: Optimized to ${optimizedFiles.length} files for display`);
+            mediaCache[path] = optimizedFiles;
           })
         );
 
         setMedia(mediaCache);
-        console.log('ModeManager: Media fetch completed');
+        console.log('ModeManager: Media fetch completed with variant optimization');
       } catch (err) {
         console.error('ModeManager: Error fetching media:', err);
       } finally {

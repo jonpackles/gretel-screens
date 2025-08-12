@@ -8,6 +8,43 @@ export interface VisibilityRecord {
 }
 
 /**
+ * Extract base filename without variant suffix
+ * e.g., "video-sm.mp4" -> "video.mp4", "image-md.jpg" -> "image.jpg"
+ */
+function getBaseFileName(filePath: string): string {
+  const dir = path.dirname(filePath);
+  const name = path.basename(filePath);
+  const ext = path.extname(name);
+  const baseName = path.basename(name, ext);
+  
+  // Remove variant suffixes like -sm, -md, -lg, -xl, -small, -medium, -large, -thumb
+  const baseNameClean = baseName.replace(/-(?:sm|md|lg|xl|small|medium|large|thumb)$/, '');
+  
+  return path.join(dir, baseNameClean + ext).replace(/\\/g, '/');
+}
+
+/**
+ * Check if a file is a variant (has size suffix)
+ */
+function isVariantFile(filePath: string): boolean {
+  const name = path.basename(filePath, path.extname(filePath));
+  return /-(?:sm|md|lg|xl|small|medium|large|thumb)$/.test(name);
+}
+
+/**
+ * Extract variant size from filename
+ */
+export function getVariantSize(filePath: string): 'original' | 'sm' | 'md' | 'lg' | 'xl' | 'small' | 'medium' | 'large' | 'thumb' {
+  const name = path.basename(filePath, path.extname(filePath));
+  const match = name.match(/-(?:sm|md|lg|xl|small|medium|large|thumb)$/);
+  
+  if (!match) return 'original';
+  
+  const suffix = match[0].slice(1); // Remove the '-'
+  return suffix as any;
+}
+
+/**
  * Ensure the .data directory exists
  */
 function ensureDataDir() {
@@ -47,24 +84,52 @@ export function saveVisibilityDb(db: VisibilityRecord): void {
 }
 
 /**
- * Get visibility for a specific file
+ * Get visibility for a specific file (with variant inheritance)
  */
 export function getFileVisibility(filePath: string): 'visible' | 'hidden' {
   const db = loadVisibilityDb();
-  return db[filePath] || 'visible'; // Default to visible
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  
+  // Check direct visibility first
+  if (normalizedPath in db) {
+    return db[normalizedPath];
+  }
+  
+  // If this is a variant, check the base file's visibility
+  if (isVariantFile(normalizedPath)) {
+    const basePath = getBaseFileName(normalizedPath);
+    if (basePath in db) {
+      return db[basePath];
+    }
+  }
+  
+  return 'visible'; // Default to visible
 }
 
 /**
- * Set visibility for a specific file
+ * Set visibility for a specific file (and optionally apply to all variants)
  */
-export function setFileVisibility(filePath: string, visibility: 'visible' | 'hidden'): void {
+export function setFileVisibility(
+  filePath: string, 
+  visibility: 'visible' | 'hidden',
+  applyToVariants: boolean = true
+): void {
   const db = loadVisibilityDb();
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  
   if (visibility === 'visible') {
     // Remove from database if setting to visible (default state)
-    delete db[filePath];
+    delete db[normalizedPath];
   } else {
-    db[filePath] = visibility;
+    db[normalizedPath] = visibility;
   }
+  
+  // If applying to variants and this is a base file, also set visibility for all variants
+  if (applyToVariants && !isVariantFile(normalizedPath)) {
+    // Note: We store the base file visibility, and variants inherit it via getFileVisibility
+    // This is more efficient than storing each variant separately
+  }
+  
   saveVisibilityDb(db);
 }
 
