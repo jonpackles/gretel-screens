@@ -1,0 +1,61 @@
+{
+  "video": {
+    "small": {
+      "width": 854,
+      "height": 480,
+      "crf": 28,
+      "preset": "medium",
+      "description": "Small variant for Grid mode performance"
+    },
+    "medium": {
+      "width": 1280,
+      "height": 720,
+      "crf": 25,
+      "preset": "medium",
+      "description": "Medium variant for Paths/Carousel modes"
+    },
+    "large": {
+      "width": 1920,
+      "height": 1080,
+      "crf": 22,
+      "preset": "medium",
+      "description": "Large variant for high-quality display"
+    }
+  },
+  "image": {
+    "small": {
+      "width": 854,
+      "height": 480,
+      "quality": 82,
+      "description": "Small variant for Grid mode"
+    },
+    "medium": {
+      "width": 1280,
+      "height": 720,
+      "quality": 87,
+      "description": "Medium variant for general display"
+    },
+    "large": {
+      "width": 1920,
+      "height": 1080,
+      "quality": 92,
+      "description": "Large variant for detailed viewing"
+    }
+  },
+  "processing": {
+    "processSubdirectories": true,
+    "skipExisting": true,
+    "parallel": false,
+    "description": "Processing behavior settings"
+  },
+  "fileTypes": {
+    "video": ["mp4", "mov", "avi", "mkv"],
+    "image": ["jpg", "jpeg", "png", "tiff", "webp"],
+    "description": "Supported file extensions"
+  },
+  "performance": {
+    "ffmpegPreset": "medium",
+    "threads": 0,
+    "description": "Performance tuning (0 = auto threads)"
+  }
+} 

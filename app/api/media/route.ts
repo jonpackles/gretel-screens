@@ -10,6 +10,7 @@ import {
   getMimeType 
 } from '@/shared/utils/mediaMetadata';
 import { loadVisibilityDb } from '@/shared/utils/visibilityDb';
+import { filterVariantsForDashboard, isVariantFile } from '@/shared/utils/variantUtils';
 
 const BASE_PATH = path.join(process.cwd(), 'public/content');
 const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm', '.ogg'];
@@ -112,12 +113,18 @@ async function processFile(absolutePath: string, relativePath: string, stat: fs.
     ? pathParts[projectIndex + 1] 
     : undefined;
 
-  // Get visibility from database
-  const visibilityDb = loadVisibilityDb();
+  // Get visibility from database (with variant inheritance)
   const normalizedPath = relativePath.replace(/\\/g, '/');
-  const visibility = visibilityDb[normalizedPath] || 'visible';
+  const { getFileVisibility, getVariantSize } = await import('@/shared/utils/visibilityDb');
+  const { getBaseFileName, isVariantFile } = await import('@/shared/utils/variantUtils');
+  const visibility = getFileVisibility(normalizedPath);
 
-  // Create base MediaItem with visibility
+  // Extract variant information
+  const variantSize = getVariantSize(normalizedPath);
+  const isVariant = isVariantFile(normalizedPath);
+  const basePath = isVariant ? getBaseFileName(normalizedPath) : normalizedPath;
+
+  // Create base MediaItem with visibility and variant info
   const mediaItem: MediaItem = {
     name,
     type: 'file' as const,
@@ -126,7 +133,10 @@ async function processFile(absolutePath: string, relativePath: string, stat: fs.
     lastModified: stat.mtime.toISOString(),
     fileSize: stat.size,
     mimeType: getMimeType(ext),
-    visibility, // Include visibility in initial creation
+    visibility,
+    variantSize,
+    basePath,
+    isVariant,
   };
 
   // Extract additional metadata
@@ -221,7 +231,12 @@ async function getEnhancedDirectoryContents(
 /**
  * Generate cache key for directory listing
  */
-function generateCacheKey(options: MediaQueryOptions, includeHidden: boolean): string {
+function generateCacheKey(
+  options: MediaQueryOptions, 
+  includeHidden: boolean, 
+  isDashboard: boolean = false, 
+  showVariants: boolean = false
+): string {
   // Include visibility database hash in cache key
   const visibilityDb = loadVisibilityDb();
   const visibilityHash = require('crypto')
@@ -236,6 +251,8 @@ function generateCacheKey(options: MediaQueryOptions, includeHidden: boolean): s
     fileType: options.fileType || 'all',
     limit: options.limit || 50,
     includeHidden,
+    isDashboard,
+    showVariants,
     visibilityHash,
     lastVisibilityUpdate, // Include visibility update timestamp
     sortBy: options.sortBy,
@@ -280,6 +297,8 @@ export async function GET(req: NextRequest) {
   };
 
   const includeHidden = searchParams.get('includeHidden') === 'true';
+  const isDashboard = searchParams.get('dashboard') === 'true';
+  const showVariants = searchParams.get('showVariants') === 'true';
 
   const fullPath = path.join(BASE_PATH, options.path || '');
 
@@ -295,7 +314,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check directory cache first
-    const cacheKey = generateCacheKey(options, includeHidden);
+    const cacheKey = generateCacheKey(options, includeHidden, isDashboard, showVariants);
     const cached = directoryCache.get(cacheKey);
     const now = Date.now();
     
@@ -353,7 +372,20 @@ export async function GET(req: NextRequest) {
     }
 
     // Apply filters (including visibility filtering)
-    const filteredItems = items.filter(item => matchesFilters(item, options, includeHidden));
+    let filteredItems = items.filter(item => matchesFilters(item, options, includeHidden));
+    
+    // Apply variant filtering for dashboard
+    if (isDashboard && !showVariants) {
+      console.log(`📦 Dashboard mode: filtering variants from ${filteredItems.length} items`);
+      const { displayItems } = filterVariantsForDashboard(filteredItems);
+      filteredItems = displayItems;
+      console.log(`📦 Dashboard mode: ${filteredItems.length} primary files after variant filtering`);
+    }
+    
+    // TODO: Potential optimization - cache variant grouping results
+    // Could cache the grouped variants separately to avoid re-grouping on each request
+    // Cache key: path + file modification times hash
+    // Would be beneficial for directories with many variants
     
     // Apply sorting
     const sortedItems = sortItems(filteredItems, options.sortBy, options.sortOrder);
