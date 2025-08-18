@@ -19,6 +19,11 @@ const navItems: DashboardNavItem[] = [
     name: 'Inform',
     href: '/dashboard/inform',
     description: 'Monitor Google Calendar & Sheets data'
+  },
+  {
+    name: 'Settings',
+    href: '/dashboard/settings',
+    description: 'Global display settings and controls'
   }
 ];
 

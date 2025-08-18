@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { MediaItem } from '@/shared/types/media';
 import { usePoseDetection } from '@/shared/hooks/usePoseDetection';
+import { useGlobalSettings } from '@/shared/hooks/useGlobalSettings';
 import styles from './modes.module.scss';
 
 type SmoothedPoint = {
@@ -28,6 +29,9 @@ export default function Mosaic({ media }: MosaicProps) {
   const lastTextureRef = useRef<PIXI.Texture | null>(null);
   
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  
+  // Get global settings
+  const { settings: globalSettings } = useGlobalSettings();
   
   // Settings state
   const [settings, setSettings] = useState({
@@ -277,7 +281,7 @@ export default function Mosaic({ media }: MosaicProps) {
             const connections = [[0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8], [9, 10], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [24, 26], [25, 27], [26, 28], [11, 13], [13, 15], [15, 21], [15, 19], [15, 17], [12, 14], [14, 16], [16, 22], [16, 20], [16, 18], [23, 25], [25, 27], [27, 29], [27, 31], [24, 26], [26, 28], [28, 30], [28, 32]];
             
             // --- Draw connections as filled polygons ---
-            skeletonGraphics.beginFill(0x00ff00, 0.8);
+            skeletonGraphics.beginFill(0xffffff, 0.8);
             const lineWidth = 3;
             connections.forEach(([start, end]) => {
                 const startLm = smoothedPoints[start];
@@ -305,7 +309,7 @@ export default function Mosaic({ media }: MosaicProps) {
             skeletonGraphics.endFill();
 
             // --- Then draw joints on top ---
-            skeletonGraphics.beginFill(0xff0000, 0.8);
+            skeletonGraphics.beginFill(0xffffff, 0.8);
             smoothedPoints.forEach(lm => {
                 if (lm.visibility > 0.3) {
                     skeletonGraphics.drawCircle(lm.x, lm.y, 5); // Slightly larger joints
@@ -337,8 +341,9 @@ export default function Mosaic({ media }: MosaicProps) {
 
   return (
     <>
-      {/* Controls */}
-      <div className="fixed top-4 left-4 z-10 bg-black/50 p-4 rounded">
+      {/* Controls - only show if overlays are not hidden */}
+      {!globalSettings.hideOverlays && (
+        <div className="fixed top-4 left-4 z-10 bg-black/50 p-4 rounded">
         <label className="block text-white text-sm mb-2">
           Tile Size: {settings.tileSize}px
         </label>
@@ -400,10 +405,11 @@ export default function Mosaic({ media }: MosaicProps) {
             {media[currentMediaIndex]?.name}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
-      {/* Camera Status */}
-      {settings.useCamera && (
+      {/* Camera Status - only show if overlays are not hidden */}
+      {!globalSettings.hideOverlays && settings.useCamera && (
         <div className="fixed top-4 right-4 z-10 bg-black/50 p-4 rounded text-white text-sm">
           <div>Camera: {cameraActive ? '✓' : '...'}</div>
           <div>Pose: {poseDetected ? '✓ Detected' : '◦ Searching...'}</div>
@@ -417,7 +423,7 @@ export default function Mosaic({ media }: MosaicProps) {
         </div>
       )}
 
-      {/* Camera Preview */}
+      {/* Camera Preview - always render for pose detection, but hide if overlays disabled */}
       {settings.useCamera && (
         <video
           ref={videoRef}
@@ -431,7 +437,7 @@ export default function Mosaic({ media }: MosaicProps) {
             border: '2px solid white',
             zIndex: 9999,
             pointerEvents: 'none',
-            visibility: cameraActive ? 'visible' : 'hidden',
+            visibility: globalSettings.hideOverlays ? 'hidden' : (cameraActive ? 'visible' : 'hidden'),
           }}
           muted
           autoPlay
