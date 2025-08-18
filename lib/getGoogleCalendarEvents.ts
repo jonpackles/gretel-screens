@@ -54,16 +54,7 @@ export async function getGoogleCalendarEvents() {
         time = '';
       }
 
-      // Image attachment logic
-      let imageUrl: string | undefined = undefined;
-      if (Array.isArray(event.attachments)) {
-        const imageAttachment = event.attachments.find((att: any) =>
-          att.mimeType && att.mimeType.startsWith('image/') && att.fileUrl
-        );
-        if (imageAttachment) {
-          imageUrl = imageAttachment.fileUrl;
-        }
-      }
+      // Image URL will be added via dashboard editing only
 
       return {
         id: event.id || '',
@@ -87,10 +78,31 @@ export async function getGoogleCalendarEvents() {
           // Fallback to converted date if needed
           return startTime ? startTime.toISOString().split('T')[0] : '';
         })(),
-        endDate: endTime ? endTime.toISOString().split('T')[0] : undefined,
+        endDate: (() => {
+          if (!endTime) return undefined;
+          
+          const startDate = (() => {
+            // For all-day events, use the date field directly
+            if (event.start?.date && !event.start?.dateTime) {
+              return event.start.date;
+            }
+            
+            // For timed events, extract date from the original dateTime string
+            if (event.start?.dateTime) {
+              return event.start.dateTime.split('T')[0];
+            }
+            
+            // Fallback to converted date if needed
+            return startTime ? startTime.toISOString().split('T')[0] : '';
+          })();
+          
+          const endDate = endTime.toISOString().split('T')[0];
+          
+          // Only return end date if it's different from start date
+          return endDate !== startDate ? endDate : undefined;
+        })(),
         time,
         location,
-        imageUrl,
       };
     });
   } catch (error) {
