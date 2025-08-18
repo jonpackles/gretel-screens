@@ -87,6 +87,7 @@ export async function getGoogleCalendarEvents() {
           // Fallback to converted date if needed
           return startTime ? startTime.toISOString().split('T')[0] : '';
         })(),
+        endDate: endTime ? endTime.toISOString().split('T')[0] : undefined,
         time,
         location,
         imageUrl,
