@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import { usePoseDetection } from '@/shared/hooks/usePoseDetection';
+import { useGlobalSettings } from '@/shared/hooks/useGlobalSettings';
 import styles from './modes.module.scss';
 
 type Point = { x: number; y: number };
@@ -21,6 +22,9 @@ type PoseHouseProps = {
 export default function PoseHouse({}: PoseHouseProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
+  
+  // Get global settings
+  const { settings: globalSettings } = useGlobalSettings();
   
   // Use the pose detection hook
   const {
@@ -235,7 +239,7 @@ export default function PoseHouse({}: PoseHouseProps) {
       style={{ cursor: 'none' }}
       onClick={enterFullscreen}
     >
-      {/* Camera preview - separate from PIXI container */}
+      {/* Camera preview - always render for pose detection, but hide if overlays disabled */}
       <video
         ref={videoRef}
         style={{ 
@@ -246,7 +250,8 @@ export default function PoseHouse({}: PoseHouseProps) {
           height: 120,
           border: '2px solid white',
           zIndex: 9999,
-          pointerEvents: 'none'
+          pointerEvents: 'none',
+          visibility: globalSettings.hideOverlays ? 'hidden' : 'visible'
         }}
         muted
         autoPlay
@@ -265,8 +270,8 @@ export default function PoseHouse({}: PoseHouseProps) {
         }}
       />
 
-      {/* Loading state */}
-      {!cameraActive && (
+      {/* Loading state - only show if overlays are not hidden */}
+      {!globalSettings.hideOverlays && !cameraActive && (
         <div style={{
           position: 'absolute',
           top: '50%',
@@ -280,25 +285,27 @@ export default function PoseHouse({}: PoseHouseProps) {
         </div>
       )}
 
-      {/* Status indicators */}
-      <div style={{
-        position: 'fixed',
-        top: 20,
-        left: 20,
-        color: 'white',
-        fontSize: '16px',
-        zIndex: 9999,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        padding: '10px',
-        borderRadius: '5px',
-        pointerEvents: 'none'
-      }}>
-        <div>Camera: {cameraActive ? '✓' : '...'}</div>
-        <div>Pose: {poseDetected ? '✓ Full Body Detected' : '◦ Searching for full body...'}</div>
-        <div style={{ fontSize: '12px', marginTop: '5px' }}>
-          Debug: {debugInfo}
+      {/* Status indicators - only show if overlays are not hidden */}
+      {!globalSettings.hideOverlays && (
+        <div style={{
+          position: 'fixed',
+          top: 20,
+          left: 20,
+          color: 'white',
+          fontSize: '16px',
+          zIndex: 9999,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          padding: '10px',
+          borderRadius: '5px',
+          pointerEvents: 'none'
+        }}>
+          <div>Camera: {cameraActive ? '✓' : '...'}</div>
+          <div>Pose: {poseDetected ? '✓ Full Body Detected' : '◦ Searching for full body...'}</div>
+          <div style={{ fontSize: '12px', marginTop: '5px' }}>
+            Debug: {debugInfo}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Camera status indicator */}
       {cameraActive && (

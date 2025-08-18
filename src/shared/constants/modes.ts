@@ -8,6 +8,7 @@ export const AVAILABLE_MODES = [
   'Inform Projects',
   'Grid',
   'Paths',
+  'Inform',
 ] as const;
 
 export type ModeName = typeof AVAILABLE_MODES[number];

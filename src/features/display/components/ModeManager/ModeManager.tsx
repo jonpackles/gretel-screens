@@ -12,7 +12,6 @@ import {
 
 // Import all available modes from the new structure
 import Slideshow from '../../modes/Slideshow';
-import Calendar from '../../modes/Calendar';
 import VerticalCarousel from '../../modes/VerticalCarousel';
 import PoseHouse from '../../modes/PoseHouse';
 import Inform from '../../modes/Inform';
@@ -67,12 +66,7 @@ const MODE_CONFIGS: ModeConfig[] = [
     mediaPath: 'linked-content/posters',
     variantSize: 'md', // Medium for carousel items
   },
-  {
-    component: Calendar,
-    name: 'Calendar',
-    duration: 5000, // 20 seconds
-    mediaPath: undefined, // Calendar doesn't need media
-  },
+
   {
     component: PoseHouse,
     name: 'Pose House',

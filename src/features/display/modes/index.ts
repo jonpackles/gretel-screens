@@ -2,7 +2,6 @@ import { lazy } from 'react';
 import { MediaItem } from '@/types';
 
 // Lazy load all modes for better performance
-export const Calendar = lazy(() => import('./Calendar'));
 export const Grid = lazy(() => import('./Grid'));
 export const Inform = lazy(() => import('./Inform'));
 export const Mosaic = lazy(() => import('./Mosaic'));
@@ -17,7 +16,6 @@ export const InformProjects = lazy(() => import('./inform/ProjectsMode'));
 
 // Mode registry for dynamic access
 export const MODE_REGISTRY = {
-  'Calendar': Calendar,
   'Grid': Grid,
   'Inform': Inform,
   'Mosaic': Mosaic,
