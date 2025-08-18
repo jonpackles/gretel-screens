@@ -21,15 +21,31 @@ export default function EventBlock({ data, mode, formatDate }: Props) {
   const displayText = data.body || data.description;
   
   // Check if it's a multi-day event by comparing dates
-  const isMultiDay = data.endDate && data.endDate !== data.date;
+  // Only consider it multi-day if endDate exists, is different from date, and both are valid
+  const isMultiDay = data.endDate && 
+                     data.endDate !== data.date && 
+                     data.endDate.trim() !== '' && 
+                     data.date && 
+                     data.date.trim() !== '';
+
+  // Debug logging for date issues
+  if (data.endDate && data.endDate === data.date) {
+    console.log(`🐛 Same-day event with endDate: ${data.title} | start: ${data.date} | end: ${data.endDate}`);
+  }
   
   // Format date range for multi-day events
   const formatDateRange = () => {
     if (!data.date) return '';
     
     if (isMultiDay) {
-      // Multi-day event
-      return `${formatDate(data.date)} - ${formatDate(data.endDate!)}`;
+      // Multi-day event with line break
+      return (
+        <>
+          {formatDate(data.date)} –
+          <br />
+          {formatDate(data.endDate!)}
+        </>
+      );
     } else {
       // Single day event
       return formatDate(data.date);
@@ -75,7 +91,13 @@ export default function EventBlock({ data, mode, formatDate }: Props) {
             const [year2, month2, day2] = data.endDate!.split('-');
             const startDate = new Date(parseInt(year1), parseInt(month1) - 1, parseInt(day1));
             const endDate = new Date(parseInt(year2), parseInt(month2) - 1, parseInt(day2));
-            return `${startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
+            return (
+              <>
+                {startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} –
+                <br />
+                {endDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </>
+            );
           } else {
             // Parse date string as local date to avoid timezone conversion issues
             const [year, month, day] = data.date.split('-');

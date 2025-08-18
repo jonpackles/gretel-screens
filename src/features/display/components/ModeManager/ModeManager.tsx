@@ -308,6 +308,38 @@ export default function ModeManager({
     enabled: true,
   });
 
+  // Listen for external control messages (e.g., from dual screen view)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'NEXT_MODE') {
+        setCurrentModeIndex((prev) => (prev + 1) % activeModes.length);
+      } else if (event.data.type === 'PREV_MODE') {
+        setCurrentModeIndex((prev) => prev === 0 ? activeModes.length - 1 : prev - 1);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [activeModes.length]);
+
+  // Notify parent window about mode changes
+  useEffect(() => {
+    if (currentMode && window.parent !== window) {
+      // Get screen identifier from URL
+      const screenId = window.location.pathname.includes('screen-a') ? 'screen-a' : 
+                      window.location.pathname.includes('screen-b') ? 'screen-b' : null;
+      
+      if (screenId) {
+        window.parent.postMessage({
+          type: 'MODE_CHANGED',
+          screen: screenId,
+          mode: currentMode.name,
+          index: currentModeIndex
+        }, '*');
+      }
+    }
+  }, [currentMode, currentModeIndex]);
+
   // Handle empty or invalid mode selection
   if (activeModes.length === 0) {
     return (
