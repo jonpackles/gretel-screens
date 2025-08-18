@@ -165,7 +165,7 @@ export default function ModeManager({
           variantSize: item.variantSize ?? base.variantSize,
         };
       })
-      .filter((m): m is ModeConfig => m !== null);
+      .filter((m): m is NonNullable<typeof m> => m !== null);
   }, [sequence]);
 
   const currentMode = activeModes[currentModeIndex];
