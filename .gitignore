@@ -41,3 +41,4 @@ next-env.d.ts
 public/content/linked-content/
 public/content/linked-content
 .data/visibility.json
+ecosystem.config.js
