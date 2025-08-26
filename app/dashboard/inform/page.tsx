@@ -673,7 +673,7 @@ export default function InformMonitor() {
                           {/* Multiple media */}
                           {(override?.overrides?.mediaUrls?.length || item.data.mediaUrls?.length) ? (
                             <div className="grid grid-cols-4 gap-2">
-                              {(override?.overrides?.mediaUrls || item.data.mediaUrls || []).map((mediaUrl, index) => (
+                              {(override?.overrides?.mediaUrls || item.data.mediaUrls || []).map((mediaUrl: string, index: number) => (
                                 <div key={index} className="relative">
                                   {mediaUrl.match(/\.(mp4|mov|avi|webm)$/i) ? (
                                     <video

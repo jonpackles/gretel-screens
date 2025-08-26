@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { MediaItem } from '@/shared/types/media';
 import { usePoseDetection } from '@/shared/hooks/usePoseDetection';
-import { useGlobalSettings } from '@/shared/hooks/useGlobalSettings';
+
 import styles from './modes.module.scss';
 
 type SmoothedPoint = {
@@ -30,8 +30,7 @@ export default function Mosaic({ media }: MosaicProps) {
   
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   
-  // Get global settings
-  const { settings: globalSettings } = useGlobalSettings();
+
   
   // Settings state
   const [settings, setSettings] = useState({
@@ -41,6 +40,9 @@ export default function Mosaic({ media }: MosaicProps) {
     useCamera: true,
     showMosaic: true,
   });
+
+  // Local state for overlay visibility (default to showing overlays)
+  const [hideOverlays] = useState(false);
 
   // Refs for animation loop
   const settingsRef = useRef(settings);
@@ -342,7 +344,7 @@ export default function Mosaic({ media }: MosaicProps) {
   return (
     <>
       {/* Controls - only show if overlays are not hidden */}
-      {!globalSettings.hideOverlays && (
+      {!hideOverlays && (
         <div className="fixed top-4 left-4 z-10 bg-black/50 p-4 rounded">
         <label className="block text-white text-sm mb-2">
           Tile Size: {settings.tileSize}px
@@ -409,7 +411,7 @@ export default function Mosaic({ media }: MosaicProps) {
       )}
 
       {/* Camera Status - only show if overlays are not hidden */}
-      {!globalSettings.hideOverlays && settings.useCamera && (
+      {!hideOverlays && settings.useCamera && (
         <div className="fixed top-4 right-4 z-10 bg-black/50 p-4 rounded text-white text-sm">
           <div>Camera: {cameraActive ? '✓' : '...'}</div>
           <div>Pose: {poseDetected ? '✓ Detected' : '◦ Searching...'}</div>
@@ -437,7 +439,7 @@ export default function Mosaic({ media }: MosaicProps) {
             border: '2px solid white',
             zIndex: 9999,
             pointerEvents: 'none',
-            visibility: globalSettings.hideOverlays ? 'hidden' : (cameraActive ? 'visible' : 'hidden'),
+            visibility: hideOverlays ? 'hidden' : (cameraActive ? 'visible' : 'hidden'),
           }}
           muted
           autoPlay

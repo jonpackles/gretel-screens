@@ -33,3 +33,22 @@ export interface CacheStats {
     totalCaches: number;
   };
 }
+
+export interface HealthCheck {
+  name: string;
+  status: 'healthy' | 'warning' | 'error';
+  message: string;
+  details?: any;
+  timestamp: string;
+}
+
+export interface SystemHealthReport {
+  overall: 'healthy' | 'warning' | 'error';
+  checks: HealthCheck[];
+  summary: {
+    healthy: number;
+    warnings: number;
+    errors: number;
+  };
+  timestamp: string;
+}
