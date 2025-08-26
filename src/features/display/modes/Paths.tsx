@@ -7,12 +7,35 @@ const SHAPES = ["house", "sine", "infinity", "circle"] as const;
 type ShapeName = typeof SHAPES[number];
 const STEP_MS = 100; // Speed of animation (ms per step)
 const PAUSE_MS = 3000; // Pause at end of shape (ms)
-const VIDEO_SIZE = 220;
+const VIDEO_SIZE = 170;
 const VIDEO_SPACING = 120;
 
-function getShapePath(shape: ShapeName, count: number): { x: number; y: number }[] {
+function getShapePath(shape: ShapeName, count: number, containerSize?: { width: number; height: number }): { x: number; y: number }[] {
   switch (shape) {
     case "house":
+      if (containerSize) {
+        // Define house in a square coordinate system to maintain aspect ratio
+        const size = Math.min(containerSize.width, containerSize.height) * 0.6; // 60% of the smaller dimension
+        const centerX = containerSize.width / 2;
+        const centerY = containerSize.height / 2;
+        
+        // Original house proportions (in a 1x1 square)
+        const housePoints = [
+          { x: -0.15, y: 0.2 },   // bottom left
+          { x: -0.15, y: -0.1 },  // left wall up
+          { x: 0, y: -0.3 },      // roof peak
+          { x: 0.15, y: -0.1 },   // right wall down
+          { x: 0.15, y: 0.2 },    // bottom right
+          { x: -0.15, y: 0.2 },   // back to start
+        ];
+        
+        // Scale and center the house
+        return housePoints.map(pt => ({
+          x: centerX + pt.x * size,
+          y: centerY + pt.y * size,
+        }));
+      }
+      // Fallback to relative coordinates if no container size
       return [
         { x: 0.35, y: 0.7 },
         { x: 0.35, y: 0.4 },
@@ -50,9 +73,15 @@ function getShapePath(shape: ShapeName, count: number): { x: number; y: number }
   }
 }
 
-function getEvenlySpacedPoints(path: { x: number; y: number }[], spacingPx: number, width: number, height: number) {
+function getEvenlySpacedPoints(path: { x: number; y: number }[], spacingPx: number, containerSize?: { width: number; height: number }) {
   if (path.length < 2) return [];
-  const pts = path.map((p) => ({ x: p.x * width, y: p.y * height }));
+  
+  // If path points are between 0-1 (relative), convert to absolute; otherwise use as-is
+  const needsConversion = path.some(p => p.x <= 1 && p.y <= 1 && p.x >= 0 && p.y >= 0);
+  const pts = needsConversion && containerSize 
+    ? path.map((p) => ({ x: p.x * containerSize.width, y: p.y * containerSize.height }))
+    : path;
+  
   const segLens = pts.slice(1).map((p, i) => Math.hypot(p.x - pts[i].x, p.y - pts[i].y));
   const totalLen = segLens.reduce((a, b) => a + b, 0);
   const n = Math.max(2, Math.floor(totalLen / spacingPx));
@@ -101,8 +130,8 @@ export default function Paths({ media }: { media: MediaItem[] }) {
   }, []);
 
   // Get path points for current shape
-  const basePath = getShapePath(SHAPES[shapeIdx], 100);
-  const points = getEvenlySpacedPoints(basePath, VIDEO_SPACING, containerSize.width, containerSize.height);
+  const basePath = getShapePath(SHAPES[shapeIdx], 100, containerSize);
+  const points = getEvenlySpacedPoints(basePath, VIDEO_SPACING, containerSize);
   const videoMedia = media.filter((m) => /\.mp4$/i.test(m.name));
   
   // Use videos starting from current mediaIdx position
