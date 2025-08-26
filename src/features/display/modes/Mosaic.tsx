@@ -42,7 +42,7 @@ export default function Mosaic({ media }: MosaicProps) {
   });
 
   // Local state for overlay visibility (default to showing overlays)
-  const [hideOverlays] = useState(false);
+  const [hideOverlays] = useState(true);
 
   // Refs for animation loop
   const settingsRef = useRef(settings);
