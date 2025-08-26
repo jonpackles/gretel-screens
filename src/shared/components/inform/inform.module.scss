@@ -142,3 +142,76 @@
 //   /* Content wrapper styles */
 //   position: relative;
 // }
+
+/* Media Grid Styles */
+.media-grid {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  width: 100%;
+  max-height: 60vh; /* Limit vertical space to 60% of viewport */
+  overflow: hidden;
+  
+  /* Dynamic grid based on number of items */
+  &:has(.media-item:nth-child(1):last-child) {
+    /* Single item - full width */
+    grid-template-columns: 1fr;
+  }
+  
+  &:has(.media-item:nth-child(2):last-child) {
+    /* Two items - side by side */
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  &:has(.media-item:nth-child(3):last-child) {
+    /* Three items - 2x2 grid with one spanning */
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    
+    .media-item:first-child {
+      grid-column: 1 / -1; /* Span full width */
+    }
+  }
+  
+  &:has(.media-item:nth-child(4):last-child) {
+    /* Four items - 2x2 grid */
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  
+  &:has(.media-item:nth-child(n+5)) {
+    /* Five or more items - 2x3 grid */
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(3, 1fr);
+  }
+}
+
+.media-item {
+  position: relative;
+  overflow: hidden;
+//   border-radius: 8px;
+  background: #f5f5f5;
+  aspect-ratio: 16/9; /* Consistent aspect ratio */
+  min-height: 0; /* Allow flex shrinking */
+}
+
+.media-content {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-height: 800px) {
+  .media-grid {
+    max-height: 50vh; /* Reduce on smaller screens */
+  }
+}
+
+@media (max-height: 600px) {
+  .media-grid {
+    max-height: 40vh; /* Further reduce on very small screens */
+  }
+}

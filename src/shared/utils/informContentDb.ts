@@ -18,6 +18,7 @@ export interface InformContentOverride {
     team?: string[];
     status?: string;
     imageUrl?: string;
+    mediaUrls?: string[]; // Support for multiple media files
   };
   visibility: 'visible' | 'hidden';
   lastModified: string;
