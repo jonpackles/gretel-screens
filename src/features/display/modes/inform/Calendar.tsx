@@ -46,6 +46,21 @@ export default function Calendar() {
   // Animation loop for seamless upward scrolling
   useEffect(() => {
     if (animatedContent.length === 0) return;
+    
+    // Check if content actually overflows the container
+    const container = containerRef.current;
+    if (!container) return;
+    
+    // Calculate total content height
+    const totalContentHeight = blockRefs.current.reduce((total, block) => {
+      return total + (block?.offsetHeight || 0);
+    }, 0);
+    
+    // Only animate if content overflows the container
+    if (totalContentHeight <= container.clientHeight) {
+      return; // Don't start animation if content fits in viewport
+    }
+    
     let animationFrame: number;
     let lastTimestamp = performance.now();
 
