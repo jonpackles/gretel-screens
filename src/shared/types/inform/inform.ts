@@ -21,4 +21,6 @@ export type ContentBlock = {
     description?: string;
     team?: string[];
     status?: "In Progress" | "Shipped" | "Paused";
+    imageUrl?: string;  // Selected image from project folder (backward compatibility)
+    mediaUrls?: string[]; // Multiple selected media files from project folder
   };

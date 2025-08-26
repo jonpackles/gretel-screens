@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ImageSelector from '@/shared/components/inform/ImageSelector';
 
 interface GoogleDataState {
   calendarEvents: any[];
@@ -30,6 +31,14 @@ export default function InformMonitor() {
   const [editValue, setEditValue] = useState<string>('');
   const [contentOverrides, setContentOverrides] = useState<any>({});
   const [resettingContent, setResettingContent] = useState<string | null>(null);
+  const [imageSelectorOpen, setImageSelectorOpen] = useState<string | null>(null); // contentId for image selection
+  const [dataSourceUrls, setDataSourceUrls] = useState<{
+    calendar: { hasId: boolean; url: string | null };
+    sheet: { hasId: boolean; url: string | null };
+  }>({
+    calendar: { hasId: false, url: null },
+    sheet: { hasId: false, url: null }
+  });
 
   const broadcastUpdate = () => {
     // Notify all displays that content has been updated
@@ -156,6 +165,55 @@ export default function InformMonitor() {
     }
   };
 
+  const handleImageSelect = async (contentId: string, imageUrl: string | null) => {
+    try {
+      const res = await fetch('/api/inform/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set-overrides',
+          contentId,
+          overrides: { imageUrl: imageUrl || '' }
+        })
+      });
+      
+      if (res.ok) {
+        await fetchContentOverrides();
+        await fetchData();
+        broadcastUpdate();
+      }
+    } catch (error) {
+      console.error('Failed to update image:', error);
+    }
+  };
+
+  const handleMediaSelect = async (projectId: string, mediaUrls: string[]) => {
+    try {
+      const res = await fetch('/api/inform/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set-overrides',
+          contentId: projectId,
+          overrides: {
+            mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+            // Keep backward compatibility for single selection
+            imageUrl: mediaUrls.length === 1 ? mediaUrls[0] : undefined
+          }
+        })
+      });
+      
+      if (res.ok) {
+        await fetchContentOverrides();
+        await fetchData();
+        broadcastUpdate();
+      }
+    } catch (error) {
+      console.error('Failed to update media:', error);
+    }
+    setImageSelectorOpen(null);
+  };
+
   const fetchData = async () => {
     setData(prev => ({ ...prev, loading: true }));
     const timestamp = new Date().toISOString();
@@ -207,9 +265,23 @@ export default function InformMonitor() {
     }
   };
 
+  // Fetch data source URLs
+  const fetchDataSourceUrls = async () => {
+    try {
+      const res = await fetch('/api/dashboard/data-sources');
+      if (res.ok) {
+        const urls = await res.json();
+        setDataSourceUrls(urls);
+      }
+    } catch (error) {
+      console.error('Failed to fetch data source URLs:', error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     fetchContentOverrides();
+    fetchDataSourceUrls();
   }, []);
 
   const InlineEditField = ({ 
@@ -589,6 +661,73 @@ export default function InformMonitor() {
                         displayValue={override?.overrides?.status || item.data.status || 'No status'}
                         label="Status"
                       />
+                      
+                      {/* Project Image Selection Zone */}
+                                        <div className="border-t pt-3 mt-3">
+                    <div className="flex flex-col gap-3">
+                      <span className="font-medium text-sm text-gray-600">Project Media:</span>
+                      
+                      {/* Display current media selection */}
+                      {(override?.overrides?.mediaUrls?.length || override?.overrides?.imageUrl || item.data.mediaUrls?.length || item.data.imageUrl) ? (
+                        <div className="flex flex-col gap-2">
+                          {/* Multiple media */}
+                          {(override?.overrides?.mediaUrls?.length || item.data.mediaUrls?.length) ? (
+                            <div className="grid grid-cols-4 gap-2">
+                              {(override?.overrides?.mediaUrls || item.data.mediaUrls || []).map((mediaUrl, index) => (
+                                <div key={index} className="relative">
+                                  {mediaUrl.match(/\.(mp4|mov|avi|webm)$/i) ? (
+                                    <video
+                                      src={mediaUrl}
+                                      className="w-full h-16 object-cover rounded border"
+                                      muted
+                                    />
+                                  ) : (
+                                    <img
+                                      src={mediaUrl}
+                                      alt={`Project media ${index + 1}`}
+                                      className="w-full h-16 object-cover rounded border"
+                                    />
+                                  )}
+                                  <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                                    {index + 1}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            /* Single media (backward compatibility) */
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={override?.overrides?.imageUrl || item.data.imageUrl}
+                                alt="Selected project image"
+                                className="w-16 h-16 object-cover rounded border"
+                              />
+                              <span className="text-sm text-gray-600">Single image selected</span>
+                            </div>
+                          )}
+                          <span className="text-sm text-gray-600">
+                            {(override?.overrides?.mediaUrls?.length || item.data.mediaUrls?.length) 
+                              ? `${(override?.overrides?.mediaUrls || item.data.mediaUrls || []).length} media files selected`
+                              : 'Single image selected'
+                            }
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500">No media selected</span>
+                      )}
+                      
+                      {/* Selection button */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setImageSelectorOpen(item.id)}
+                          className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                        >
+                          Select Media
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                      
                       <div className="flex items-center gap-2 group">
                         <span className="font-medium text-sm text-gray-600">Team:</span>
                         <div className="flex gap-1 flex-wrap">
@@ -735,9 +874,88 @@ export default function InformMonitor() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {selectedTab === 'calendar' && renderProcessedData('event')}
-        {selectedTab === 'projects' && renderProcessedData('project')}
+        {selectedTab === 'calendar' && (
+          <div className="space-y-4">
+            {/* Calendar Data Source Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-blue-800 font-medium">Data Source</span>
+              </div>
+              <p className="text-blue-700 text-sm mt-2">
+                Calendar events are pulling from{' '}
+                {dataSourceUrls.calendar.url ? (
+                  <a 
+                    href={dataSourceUrls.calendar.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline hover:text-blue-800"
+                  >
+                    Google Calendar
+                  </a>
+                ) : (
+                  <span className="text-blue-600">Google Calendar</span>
+                )}
+                {'. Events marked as #internal or #external will be categorized accordingly.'}
+              </p>
+            </div>
+            {renderProcessedData('event')}
+          </div>
+        )}
+        {selectedTab === 'projects' && (
+          <div className="space-y-4">
+            {/* Projects Data Source Info */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-green-800 font-medium">Data Source</span>
+              </div>
+              <p className="text-green-700 text-sm mt-2">
+                Projects are pulling from{' '}
+                {dataSourceUrls.sheet.url ? (
+                  <a 
+                    href={dataSourceUrls.sheet.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 underline hover:text-green-800"
+                  >
+                    Google Sheets
+                  </a>
+                ) : (
+                  <span className="text-green-600">Google Sheets</span>
+                )}
+                {'. Update the spreadsheet to modify project information.'}
+              </p>
+            </div>
+            {renderProcessedData('project')}
+          </div>
+        )}
       </div>
+
+      {/* Image Selector Modal */}
+              {imageSelectorOpen && (
+          <ImageSelector
+            projectTitle={data.processedContent.find(item => item.id === imageSelectorOpen)?.data.title || ''}
+            currentMediaUrls={
+              contentOverrides[imageSelectorOpen]?.overrides?.mediaUrls ||
+              data.processedContent.find(item => item.id === imageSelectorOpen)?.data.mediaUrls ||
+              // Convert single imageUrl to array for compatibility
+              (contentOverrides[imageSelectorOpen]?.overrides?.imageUrl || 
+               data.processedContent.find(item => item.id === imageSelectorOpen)?.data.imageUrl) 
+                ? [contentOverrides[imageSelectorOpen]?.overrides?.imageUrl || 
+                   data.processedContent.find(item => item.id === imageSelectorOpen)?.data.imageUrl!] 
+                : []
+            }
+            allowMultiple={true}
+            onMediaSelect={(mediaUrls) => handleMediaSelect(imageSelectorOpen, mediaUrls)}
+            isOpen={true}
+            onClose={() => setImageSelectorOpen(null)}
+          />
+        )}
     </div>
   );
 } 

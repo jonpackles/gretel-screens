@@ -21,5 +21,18 @@
       "endDate": ""
     },
     "lastModified": "2025-08-18T18:03:47.831Z"
+  },
+  "project-1": {
+    "id": "project-1",
+    "visibility": "visible",
+    "overrides": {
+      "imageUrl": "/content/linked-content/projects/NYT_Crossplay_Campaign/motion/NYT_Crossplay_Test_021_v02.mp4",
+      "mediaUrls": [
+        "/content/linked-content/projects/NYT_Crossplay_Campaign/motion/NYT_Crossplay_Test_021_v02.mp4",
+        "/content/linked-content/projects/NYT_Crossplay_Campaign/motion/D2_GetBetterTogether_Motion.mp4",
+        "/content/linked-content/projects/NYT_Crossplay_Campaign/motion/NYT_Crossplay_Test_001.mp4"
+      ]
+    },
+    "lastModified": "2025-08-26T17:55:11.738Z"
   }
 }
