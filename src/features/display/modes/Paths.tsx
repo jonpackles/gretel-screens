@@ -15,7 +15,7 @@ function getShapePath(shape: ShapeName, count: number, containerSize?: { width: 
     case "house":
       if (containerSize) {
         // Define house in a square coordinate system to maintain aspect ratio
-        const size = Math.min(containerSize.width, containerSize.height) * 0.6; // 60% of the smaller dimension
+        const size = Math.min(containerSize.width, containerSize.height) * 0.85; // 60% of the smaller dimension
         const centerX = containerSize.width / 2;
         const centerY = containerSize.height / 2;
         
