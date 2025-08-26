@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { MediaItem } from "@/shared/types/media";
 
 const SHAPES = ["house", "sine", "infinity", "circle"] as const;
@@ -110,11 +110,15 @@ export default function Paths({ media }: { media: MediaItem[] }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [mediaIdx, setMediaIdx] = useState(0); // Track position in media array
   const [isPaused, setIsPaused] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pointsRef = useRef<{ x: number; y: number }[]>([]);
+  const videoMediaRef = useRef<MediaItem[]>([]);
+  const isAnimatingRef = useRef(false);
 
-  // Track container size
+  // Track container size and initialize
   useEffect(() => {
     function update() {
       if (containerRef.current) {
@@ -122,59 +126,95 @@ export default function Paths({ media }: { media: MediaItem[] }) {
           width: containerRef.current.offsetWidth,
           height: containerRef.current.offsetHeight,
         });
+        // Mark as initialized once we have a real container size
+        if (!isInitialized) {
+          console.log(`Paths: Container initialized - size: ${containerRef.current.offsetWidth}x${containerRef.current.offsetHeight}`);
+          setIsInitialized(true);
+        }
       }
     }
-    update();
+    
+    // Use a small delay to ensure DOM is ready, especially in production builds
+    const timer = setTimeout(update, 50);
+    
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  // Get path points for current shape
-  const basePath = getShapePath(SHAPES[shapeIdx], 100, containerSize);
-  const points = getEvenlySpacedPoints(basePath, VIDEO_SPACING, containerSize);
-  const videoMedia = media.filter((m) => /\.mp4$/i.test(m.name));
-  
-  // Use videos starting from current mediaIdx position
-  const usedVideos = Array.from({ length: points.length }, (_, i) => {
-    const idx = (mediaIdx + i) % videoMedia.length;
-    return videoMedia[idx];
-  });
-
-  // Animation logic
-  useEffect(() => {
-    if (points.length === 0 || usedVideos.length === 0) return;
-    if (isPaused) return;
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setCurrentIdx((idx) => {
-        if (idx < points.length) {
-          return idx + 1;
-        } else {
-          // At end: pause, then switch shape
-          setIsPaused(true);
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          timeoutRef.current = setTimeout(() => {
-            setShapeIdx((i) => (i + 1) % SHAPES.length);
-            setCurrentIdx(0);
-            // Update mediaIdx to continue from where we left off
-            setMediaIdx((prev) => (prev + points.length) % videoMedia.length);
-            setIsPaused(false);
-          }, PAUSE_MS);
-          return idx;
-        }
-      });
-    }, STEP_MS);
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      clearTimeout(timer);
+      window.removeEventListener("resize", update);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shapeIdx, isPaused, points.length, usedVideos.length]);
+  }, [isInitialized]);
 
-  // Reset currentIdx when shape changes
+  // Memoize video media to prevent unnecessary re-filtering
+  const videoMedia = useMemo(() => media.filter((m) => /\.mp4$/i.test(m.name)), [media]);
+  
+  // Memoize path points to prevent unnecessary recalculation
+  const points = useMemo(() => {
+    const basePath = getShapePath(SHAPES[shapeIdx], 100, containerSize);
+    return getEvenlySpacedPoints(basePath, VIDEO_SPACING, containerSize);
+  }, [shapeIdx, containerSize.width, containerSize.height]);
+  
+  // Update refs when values change
   useEffect(() => {
-    setCurrentIdx(0);
-  }, [shapeIdx]);
+    console.log(`Paths: Updating refs - points: ${points.length}, videoMedia: ${videoMedia.length}`);
+    pointsRef.current = points;
+    videoMediaRef.current = videoMedia;
+  }, [points, videoMedia]);
+  
+  // Memoize videos starting from current mediaIdx position to prevent flashing
+  const usedVideos = useMemo(() => {
+    return Array.from({ length: points.length }, (_, i) => {
+      const idx = (mediaIdx + i) % videoMedia.length;
+      return videoMedia[idx];
+    });
+  }, [points.length, mediaIdx, videoMedia]);
+
+  // Single animation manager effect
+  useEffect(() => {
+    if (!isInitialized || pointsRef.current.length === 0 || videoMediaRef.current.length === 0) {
+      return;
+    }
+
+    const startAnimation = () => {
+      console.log(`Paths: Starting animation for shape: ${SHAPES[shapeIdx]}`);
+      setCurrentIdx(0);
+      
+      const runAnimation = () => {
+        let step = 0;
+        const points = pointsRef.current;
+        
+        const interval = setInterval(() => {
+          step++;
+          console.log(`Paths: Animation step ${step}/${points.length}`);
+          setCurrentIdx(step);
+          
+          if (step >= points.length) {
+            clearInterval(interval);
+            console.log(`Paths: Shape complete, pausing for ${PAUSE_MS}ms`);
+            
+            setTimeout(() => {
+              console.log(`Paths: Timeout callback executing, switching to next shape`);
+              setShapeIdx((prev) => {
+                const next = (prev + 1) % SHAPES.length;
+                console.log(`Paths: Switching from ${SHAPES[prev]} to ${SHAPES[next]}`);
+                return next;
+              });
+              setMediaIdx((prev) => (prev + points.length) % videoMediaRef.current.length);
+            }, PAUSE_MS);
+          }
+        }, STEP_MS);
+        
+        return interval;
+      };
+      
+      return runAnimation();
+    };
+
+    const interval = startAnimation();
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [shapeIdx, isInitialized]); // Only restart when shape changes or initialized
 
   return (
     <div
@@ -192,7 +232,7 @@ export default function Paths({ media }: { media: MediaItem[] }) {
         if (!vid) return null;
         return (
           <video
-            key={shapeIdx + "-" + i + "-" + vid.path}
+            key={`${SHAPES[shapeIdx]}-${i}-${vid.path}`}
             src={`/content/${vid.path}`}
             autoPlay
             loop
