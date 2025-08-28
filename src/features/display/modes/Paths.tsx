@@ -174,6 +174,10 @@ export default function Paths({ media }: { media: MediaItem[] }) {
       return;
     }
 
+    let interval: NodeJS.Timeout | null = null;
+    let timeout: NodeJS.Timeout | null = null;
+    let isMounted = true;
+
     const startAnimation = () => {
       console.log(`Paths: Starting animation for shape: ${SHAPES[shapeIdx]}`);
       setCurrentIdx(0);
@@ -182,16 +186,20 @@ export default function Paths({ media }: { media: MediaItem[] }) {
         let step = 0;
         const points = pointsRef.current;
         
-        const interval = setInterval(() => {
+        interval = setInterval(() => {
+          if (!isMounted) return;
+          
           step++;
           console.log(`Paths: Animation step ${step}/${points.length}`);
           setCurrentIdx(step);
           
           if (step >= points.length) {
-            clearInterval(interval);
+            if (interval) clearInterval(interval);
             console.log(`Paths: Shape complete, pausing for ${PAUSE_MS}ms`);
             
-            setTimeout(() => {
+            timeout = setTimeout(() => {
+              if (!isMounted) return;
+              
               console.log(`Paths: Timeout callback executing, switching to next shape`);
               setShapeIdx((prev) => {
                 const next = (prev + 1) % SHAPES.length;
@@ -202,17 +210,17 @@ export default function Paths({ media }: { media: MediaItem[] }) {
             }, PAUSE_MS);
           }
         }, STEP_MS);
-        
-        return interval;
       };
       
-      return runAnimation();
+      runAnimation();
     };
 
-    const interval = startAnimation();
+    startAnimation();
     
     return () => {
+      isMounted = false;
       if (interval) clearInterval(interval);
+      if (timeout) clearTimeout(timeout);
     };
   }, [shapeIdx, isInitialized]); // Only restart when shape changes or initialized
 
