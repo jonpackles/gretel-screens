@@ -42,3 +42,6 @@ public/content/linked-content/
 public/content/linked-content
 .data/visibility.json
 ecosystem.config.js
+
+# Sentry Config File
+.env.sentry-build-plugin
