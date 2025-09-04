@@ -367,44 +367,8 @@ export default function Paths({ media }: { media: MediaItem[] }) {
   );
 }
 
-// Add static preload method to Paths
+// Add static preload method to Paths (DISABLED - using Paths3 instead)
 Paths.preload = async function(media: MediaItem[] = []) {
-  if (!media?.length) return;
-  // Filter for videos
-  const videoMedia = media.filter((m) => /\.mp4$/i.test(m.name));
-  // Only preload up to 70 videos, looping if not enough
-  const N = 70;
-  const usedVideos = Array.from({ length: N }, (_, i) => videoMedia[i % videoMedia.length]);
-  const preloadedVideos: HTMLVideoElement[] = [];
-  
-  const preloaders = usedVideos.map(item => {
-    const src = `/content/${item.path}`;
-    return new Promise(resolve => {
-      const video = document.createElement('video');
-      video.src = src;
-      video.preload = 'auto';
-      video.muted = true;
-      preloadedVideos.push(video);
-      
-      video.oncanplaythrough = () => resolve(true);
-      video.onerror = () => resolve(false);
-      
-      // Add timeout to prevent hanging
-      setTimeout(() => resolve(false), 5000);
-    });
-  });
-  
-  try {
-    await Promise.all(preloaders);
-  } finally {
-    // Clean up preloaded videos to prevent memory leaks
-    setTimeout(() => {
-      preloadedVideos.forEach(video => {
-        video.pause();
-        video.src = '';
-        video.load();
-      });
-      preloadedVideos.length = 0;
-    }, 1000); // Small delay to ensure they've been used
-  }
+  // Disabled to prevent WebMediaPlayer errors - Paths3 is active instead
+  return;
 }; 

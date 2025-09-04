@@ -9,6 +9,7 @@ const STEP_MS = 100;
 const PAUSE_MS = 3000;
 const VIDEO_SIZE = 130;
 const VIDEO_SPACING = 100;
+const MAX_CONCURRENT_VIDEOS = 50; // Limit to prevent WebMediaPlayer errors
 
 interface PathPoint {
   x: number;
@@ -27,6 +28,7 @@ interface AnimationContext {
   lastStepTime: number;
   isAnimating: boolean;
   isPaused: boolean;
+  pauseStartTime: number; // Track when pause started
   animationFrameId: number | null;
 }
 
@@ -115,12 +117,12 @@ function createVideoElement(src: string): HTMLVideoElement {
   video.style.display = 'none'; // Hide from DOM
   document.body.appendChild(video);
   
-  // Ensure video starts playing
-  video.addEventListener('loadeddata', () => {
+  // Use onloadeddata property instead of addEventListener to avoid leak
+  video.onloadeddata = () => {
     video.play().catch(() => {
       // Silent fail - autoplay restrictions are common
     });
-  });
+  };
   
   // Force play attempt immediately
   video.play().catch(() => {
@@ -128,6 +130,21 @@ function createVideoElement(src: string): HTMLVideoElement {
   });
   
   return video;
+}
+
+function forceCleanupVideo(video: HTMLVideoElement): void {
+  // Aggressive cleanup to prevent WebMediaPlayer accumulation
+  video.pause();
+  video.onloadeddata = null;
+  video.onerror = null;
+  video.onended = null;
+  video.src = '';
+  video.srcObject = null;
+  video.load(); // Force resource release
+  
+  if (document.body.contains(video)) {
+    document.body.removeChild(video);
+  }
 }
 
 function animate(context: AnimationContext) {
@@ -146,42 +163,49 @@ function animate(context: AnimationContext) {
     if (context.currentStep > pathPoints.length) {
       // Shape completed, start pause
       context.isPaused = true;
-      
-      setTimeout(() => {
-        // Clean up videos
-        videos.forEach(video => {
-          video.pause();
-          video.src = '';
-          document.body.removeChild(video);
-        });
-        context.videos = [];
-        
-        // Move to next shape
-        context.currentShape = (context.currentShape + 1) % SHAPES.length;
-        context.currentStep = 0;
-        context.isPaused = false;
-        
-        // Advance media start index to use different videos for next shape
-        context.mediaStartIndex = (context.mediaStartIndex + pathPoints.length) % context.videoMedia.length;
-        
-        // Generate new path
-        const basePath = getShapePath(SHAPES[context.currentShape], 100, {
-          width: canvas.width,
-          height: canvas.height
-        });
-        context.pathPoints = getEvenlySpacedPoints(basePath, VIDEO_SPACING);
-      }, PAUSE_MS);
+      context.pauseStartTime = now; // Track when pause started
+      // Keep videos visible during pause - don't clean up yet
     } else {
-      // Add new video for this step
-      const videoIndex = (context.mediaStartIndex + context.currentStep - 1) % context.videoMedia.length;
-      const mediaItem = context.videoMedia[videoIndex];
-      const video = createVideoElement(`/content/${mediaItem.path}`);
-      context.videos.push(video);
+      // Add new video for this step (with safety limit)
+      if (context.videos.length < MAX_CONCURRENT_VIDEOS) {
+        const videoIndex = (context.mediaStartIndex + context.currentStep - 1) % context.videoMedia.length;
+        const mediaItem = context.videoMedia[videoIndex];
+        const video = createVideoElement(`/content/${mediaItem.path}`);
+        context.videos.push(video);
+      }
     }
+  }
+
+  // Handle pause duration and shape transition
+  if (context.isPaused && now - context.pauseStartTime >= PAUSE_MS) {
+    // Clean up videos before transitioning to next shape
+    videos.forEach(forceCleanupVideo);
+    context.videos = [];
+    
+    // Pause is complete, move to next shape
+    context.currentShape = (context.currentShape + 1) % SHAPES.length;
+    context.currentStep = 0;
+    context.isPaused = false;
+    context.lastStepTime = now; // Reset step timer
+    
+    // Advance media start index to use different videos for next shape
+    context.mediaStartIndex = (context.mediaStartIndex + pathPoints.length) % context.videoMedia.length;
+    
+    // Generate new path
+    const basePath = getShapePath(SHAPES[context.currentShape], 100, {
+      width: canvas.width,
+      height: canvas.height
+    });
+    context.pathPoints = getEvenlySpacedPoints(basePath, VIDEO_SPACING);
   }
   
   // Render all active videos
-  for (let i = 0; i < Math.min(context.currentStep, pathPoints.length, videos.length); i++) {
+  // During pause, show all videos; during animation, show up to current step
+  const videosToRender = context.isPaused 
+    ? Math.min(pathPoints.length, videos.length)
+    : Math.min(context.currentStep, pathPoints.length, videos.length);
+    
+  for (let i = 0; i < videosToRender; i++) {
     const point = pathPoints[i];
     const video = videos[i];
     
@@ -225,14 +249,16 @@ function animate(context: AnimationContext) {
     }
   }
   
-  // Debug info
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(10, 10, 300, 60);
-  ctx.fillStyle = 'white';
-  ctx.font = '14px Arial';
-  ctx.fillText(`Shape: ${SHAPES[context.currentShape]} | Step: ${context.currentStep}/${pathPoints.length}`, 15, 30);
-  const playingCount = videos.filter(v => !v.paused && v.readyState >= 2).length;
-  ctx.fillText(`Videos: ${videos.length} | Active: ${Math.min(context.currentStep, pathPoints.length)} | Playing: ${playingCount}`, 15, 50);
+  // Debug info - only show in development
+  if (process.env.NODE_ENV === 'development') {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(10, 10, 300, 60);
+    ctx.fillStyle = 'white';
+    ctx.font = '14px Arial';
+    ctx.fillText(`Shape: ${SHAPES[context.currentShape]} | Step: ${context.currentStep}/${pathPoints.length}`, 15, 30);
+    const playingCount = videos.filter(v => !v.paused && v.readyState >= 2).length;
+    ctx.fillText(`Videos: ${videos.length} | Active: ${Math.min(context.currentStep, pathPoints.length)} | Playing: ${playingCount}`, 15, 50);
+  }
   
   // Continue animation
   if (context.isAnimating) {
@@ -280,6 +306,7 @@ export default function Paths3({ media }: { media: MediaItem[] }) {
       lastStepTime: Date.now(),
       isAnimating: true,
       isPaused: false,
+      pauseStartTime: 0, // Initialize pause timer
       animationFrameId: null,
     };
 
@@ -311,13 +338,7 @@ export default function Paths3({ media }: { media: MediaItem[] }) {
       }
       
       // Clean up videos
-      context.videos.forEach(video => {
-        video.pause();
-        video.src = '';
-        if (document.body.contains(video)) {
-          document.body.removeChild(video);
-        }
-      });
+      context.videos.forEach(forceCleanupVideo);
       
       window.removeEventListener('resize', handleResize);
     };

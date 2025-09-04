@@ -19,7 +19,10 @@ export function MaintenanceDashboard() {
 
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      console.log('MaintenanceDashboard: Cleared countdown interval');
+    };
   }, []);
 
   // Load initial data
@@ -44,7 +47,10 @@ export function MaintenanceDashboard() {
     
     // Refresh every 30 seconds
     const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      console.log('MaintenanceDashboard: Cleared data refresh interval');
+    };
   }, []);
 
   const runManualMaintenance = async () => {

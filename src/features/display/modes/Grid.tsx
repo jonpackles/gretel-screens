@@ -283,8 +283,9 @@ export default function Grid({ media }: GridProps) {
 // Add static preload method to Grid
 Grid.preload = async function(media: MediaItem[] = []) {
   if (!media?.length) return;
-  // Shuffle and slice to 98 items, matching the grid display logic
-  const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, GRID_SIZE);
+  // Preload only first 30 items to prevent WebMediaPlayer errors
+  const preloadCount = Math.min(30, media.length);
+  const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, preloadCount);
   const preloaders = shuffled.map(item => {
     const src = `/content/${item.path}`;
     if (/\.(mp4|webm|ogg)$/i.test(item.name)) {

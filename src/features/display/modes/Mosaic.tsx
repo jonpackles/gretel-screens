@@ -456,8 +456,9 @@ export default function Mosaic({ media }: MosaicProps) {
 Mosaic.preload = async function(media: MediaItem[] = []) {
   if (!media?.length) return;
   
-  // Preload all media items since Mosaic cycles through them
-  const preloaders = media.map(item => {
+  // Preload only first 30 items to prevent WebMediaPlayer errors
+  const preloadCount = Math.min(30, media.length);
+  const preloaders = media.slice(0, preloadCount).map(item => {
     const src = `/content/${item.path}`;
     if (/\.(mp4|webm|ogg)$/i.test(item.name)) {
       // Preload video
