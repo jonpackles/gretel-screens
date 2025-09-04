@@ -117,18 +117,54 @@ export default function Paths({ media }: { media: MediaItem[] }) {
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
   const videoMediaRef = useRef<MediaItem[]>([]);
   const isAnimatingRef = useRef(false);
+  const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const isMountedRef = useRef(true);
+
+  // Cleanup effect - runs on unmount
+  useEffect(() => {
+    return () => {
+      console.log('Paths: Component unmounting, cleaning up resources');
+      isMountedRef.current = false;
+      
+      // Clear all timers
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
+      // Clean up video elements
+      videoElementsRef.current.forEach((video, key) => {
+        video.pause();
+        video.src = '';
+        video.load(); // This releases the video resources
+      });
+      videoElementsRef.current.clear();
+    };
+  }, []);
 
   // Track container size and initialize
   useEffect(() => {
     function update() {
-      if (containerRef.current) {
-        setContainerSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
+      if (containerRef.current && isMountedRef.current) {
+        const newWidth = containerRef.current.offsetWidth;
+        const newHeight = containerRef.current.offsetHeight;
+        
+        // Only update if size actually changed to prevent unnecessary re-renders
+        setContainerSize(prevSize => {
+          if (prevSize.width !== newWidth || prevSize.height !== newHeight) {
+            console.log(`Paths: Container size changed - ${newWidth}x${newHeight}`);
+            return { width: newWidth, height: newHeight };
+          }
+          return prevSize;
         });
+        
         // Mark as initialized once we have a real container size
-        if (!isInitialized) {
-          console.log(`Paths: Container initialized - size: ${containerRef.current.offsetWidth}x${containerRef.current.offsetHeight}`);
+        if (!isInitialized && newWidth > 0 && newHeight > 0) {
+          console.log(`Paths: Container initialized - size: ${newWidth}x${newHeight}`);
           setIsInitialized(true);
         }
       }
@@ -137,10 +173,18 @@ export default function Paths({ media }: { media: MediaItem[] }) {
     // Use a small delay to ensure DOM is ready, especially in production builds
     const timer = setTimeout(update, 50);
     
-    window.addEventListener("resize", update);
+    // Throttle resize events to prevent excessive re-renders
+    let resizeTimeout: NodeJS.Timeout;
+    const throttledUpdate = () => {
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(update, 100);
+    };
+    
+    window.addEventListener("resize", throttledUpdate);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("resize", update);
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      window.removeEventListener("resize", throttledUpdate);
     };
   }, [isInitialized]);
 
@@ -159,9 +203,34 @@ export default function Paths({ media }: { media: MediaItem[] }) {
     pointsRef.current = points;
     videoMediaRef.current = videoMedia;
   }, [points, videoMedia]);
+
+  // Clean up video elements when shape changes
+  useEffect(() => {
+    return () => {
+      // Clean up video elements for the current shape
+      const currentShapeName = SHAPES[shapeIdx];
+      const keysToDelete: string[] = [];
+      
+      videoElementsRef.current.forEach((video, key) => {
+        if (key.startsWith(`${currentShapeName}-`)) {
+          video.pause();
+          video.src = '';
+          video.load();
+          keysToDelete.push(key);
+        }
+      });
+      
+      keysToDelete.forEach(key => {
+        videoElementsRef.current.delete(key);
+      });
+      
+      console.log(`Paths: Cleaned up ${keysToDelete.length} video elements for shape ${currentShapeName}`);
+    };
+  }, [shapeIdx]);
   
   // Memoize videos starting from current mediaIdx position to prevent flashing
   const usedVideos = useMemo(() => {
+    if (videoMedia.length === 0) return [];
     return Array.from({ length: points.length }, (_, i) => {
       const idx = (mediaIdx + i) % videoMedia.length;
       return videoMedia[idx];
@@ -170,15 +239,23 @@ export default function Paths({ media }: { media: MediaItem[] }) {
 
   // Single animation manager effect
   useEffect(() => {
-    if (!isInitialized || pointsRef.current.length === 0 || videoMediaRef.current.length === 0) {
+    if (!isInitialized || pointsRef.current.length === 0 || videoMediaRef.current.length === 0 || !isMountedRef.current) {
       return;
     }
 
-    let interval: NodeJS.Timeout | null = null;
-    let timeout: NodeJS.Timeout | null = null;
-    let isMounted = true;
+    // Clear any existing timers before starting new ones
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
     const startAnimation = () => {
+      if (!isMountedRef.current) return;
+      
       console.log(`Paths: Starting animation for shape: ${SHAPES[shapeIdx]}`);
       setCurrentIdx(0);
       
@@ -186,19 +263,28 @@ export default function Paths({ media }: { media: MediaItem[] }) {
         let step = 0;
         const points = pointsRef.current;
         
-        interval = setInterval(() => {
-          if (!isMounted) return;
+        intervalRef.current = setInterval(() => {
+          if (!isMountedRef.current) {
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+            return;
+          }
           
           step++;
           console.log(`Paths: Animation step ${step}/${points.length}`);
           setCurrentIdx(step);
           
           if (step >= points.length) {
-            if (interval) clearInterval(interval);
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
             console.log(`Paths: Shape complete, pausing for ${PAUSE_MS}ms`);
             
-            timeout = setTimeout(() => {
-              if (!isMounted) return;
+            timeoutRef.current = setTimeout(() => {
+              if (!isMountedRef.current) return;
               
               console.log(`Paths: Timeout callback executing, switching to next shape`);
               setShapeIdx((prev) => {
@@ -207,6 +293,7 @@ export default function Paths({ media }: { media: MediaItem[] }) {
                 return next;
               });
               setMediaIdx((prev) => (prev + points.length) % videoMediaRef.current.length);
+              timeoutRef.current = null;
             }, PAUSE_MS);
           }
         }, STEP_MS);
@@ -218,9 +305,14 @@ export default function Paths({ media }: { media: MediaItem[] }) {
     startAnimation();
     
     return () => {
-      isMounted = false;
-      if (interval) clearInterval(interval);
-      if (timeout) clearTimeout(timeout);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
   }, [shapeIdx, isInitialized]); // Only restart when shape changes or initialized
 
@@ -238,14 +330,27 @@ export default function Paths({ media }: { media: MediaItem[] }) {
       {points.slice(0, currentIdx).map((pt, i) => {
         const vid = usedVideos[i];
         if (!vid) return null;
+        
+        const videoKey = `${SHAPES[shapeIdx]}-${i}-${vid.path}`;
+        
         return (
           <video
-            key={`${SHAPES[shapeIdx]}-${i}-${vid.path}`}
+            key={videoKey}
             src={`/content/${vid.path}`}
             autoPlay
             loop
             muted
             playsInline
+            onLoadedData={(e) => {
+              // Track video element for cleanup
+              const video = e.currentTarget as HTMLVideoElement;
+              videoElementsRef.current.set(videoKey, video);
+            }}
+            onError={(e) => {
+              console.error(`Paths: Video error for ${vid.path}:`, e);
+              // Remove from tracking on error
+              videoElementsRef.current.delete(videoKey);
+            }}
             style={{
               position: "absolute",
               left: pt.x - VIDEO_SIZE / 2,
@@ -270,6 +375,8 @@ Paths.preload = async function(media: MediaItem[] = []) {
   // Only preload up to 70 videos, looping if not enough
   const N = 70;
   const usedVideos = Array.from({ length: N }, (_, i) => videoMedia[i % videoMedia.length]);
+  const preloadedVideos: HTMLVideoElement[] = [];
+  
   const preloaders = usedVideos.map(item => {
     const src = `/content/${item.path}`;
     return new Promise(resolve => {
@@ -277,9 +384,27 @@ Paths.preload = async function(media: MediaItem[] = []) {
       video.src = src;
       video.preload = 'auto';
       video.muted = true;
+      preloadedVideos.push(video);
+      
       video.oncanplaythrough = () => resolve(true);
       video.onerror = () => resolve(false);
+      
+      // Add timeout to prevent hanging
+      setTimeout(() => resolve(false), 5000);
     });
   });
-  await Promise.all(preloaders);
+  
+  try {
+    await Promise.all(preloaders);
+  } finally {
+    // Clean up preloaded videos to prevent memory leaks
+    setTimeout(() => {
+      preloadedVideos.forEach(video => {
+        video.pause();
+        video.src = '';
+        video.load();
+      });
+      preloadedVideos.length = 0;
+    }, 1000); // Small delay to ensure they've been used
+  }
 }; 

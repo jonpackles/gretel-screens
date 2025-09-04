@@ -16,7 +16,7 @@ import VerticalCarousel from '../../modes/VerticalCarousel';
 import PoseHouse from '../../modes/PoseHouse';
 import Inform from '../../modes/Inform';
 import Grid from '../../modes/Grid';
-import Paths from '../../modes/Paths';
+import Paths3 from '../../modes/Paths-3';
 import Mosaic from '../../modes/Mosaic';
 
 // Import inform sub-modes
@@ -87,7 +87,7 @@ const MODE_CONFIGS: ModeConfig[] = [
     variantSize: 'sm', // Small for performance with many grid items
   },
   {
-    component: Paths,
+    component: Paths3,
     name: 'Paths',
     duration: 30000, // 30 seconds
     mediaPath: 'linked-content/projects',
