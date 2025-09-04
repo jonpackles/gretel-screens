@@ -65,7 +65,7 @@ export default function EventBlock({ data, mode, formatDate }: Props) {
         </div>
         {data.imageUrl && (
           <div className="image">
-            <img src={data.imageUrl} alt={data.title} style={{ maxHeight: '40rem', objectFit: 'cover' }} />
+            <img src={data.imageUrl} alt={data.title} style={{ maxHeight: '20rem' }} />
           </div>
         )}
       </div>
