@@ -355,6 +355,28 @@ export default function InformMonitor() {
     );
   };
 
+  const removeImage = async (contentId: string) => {
+    try {
+      const res = await fetch('/api/inform/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set-overrides',
+          contentId,
+          overrides: { imageUrl: '' }
+        })
+      });
+      
+      if (res.ok) {
+        await fetchContentOverrides();
+        await fetchData();
+        broadcastUpdate();
+      }
+    } catch (error) {
+      console.error('Failed to remove image:', error);
+    }
+  };
+
   const ImageEditField = ({ contentId, currentImageUrl }: { contentId: string; currentImageUrl: string }) => {
     const isEditing = editingField === `${contentId}:imageUrl`;
     
@@ -444,6 +466,15 @@ export default function InformMonitor() {
         >
           ✏️
         </button>
+        {currentImageUrl && (
+          <button
+            onClick={() => removeImage(contentId)}
+            className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-opacity"
+            title="Remove image"
+          >
+            🗑️
+          </button>
+        )}
       </div>
     );
   };
