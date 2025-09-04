@@ -23,6 +23,7 @@ interface AnimationContext {
   currentStep: number;
   pathPoints: PathPoint[];
   videoMedia: MediaItem[];
+  mediaStartIndex: number; // Track where we are in the media array
   lastStepTime: number;
   isAnimating: boolean;
   isPaused: boolean;
@@ -32,7 +33,7 @@ interface AnimationContext {
 function getShapePath(shape: ShapeName, count: number, containerSize: { width: number; height: number }): PathPoint[] {
   switch (shape) {
     case "house":
-      const size = Math.min(containerSize.width, containerSize.height) * 0.6;
+      const size = Math.min(containerSize.width, containerSize.height) * 0.9;
       const centerX = containerSize.width / 2;
       const centerY = containerSize.height / 2;
       
@@ -160,6 +161,9 @@ function animate(context: AnimationContext) {
         context.currentStep = 0;
         context.isPaused = false;
         
+        // Advance media start index to use different videos for next shape
+        context.mediaStartIndex = (context.mediaStartIndex + pathPoints.length) % context.videoMedia.length;
+        
         // Generate new path
         const basePath = getShapePath(SHAPES[context.currentShape], 100, {
           width: canvas.width,
@@ -169,7 +173,7 @@ function animate(context: AnimationContext) {
       }, PAUSE_MS);
     } else {
       // Add new video for this step
-      const videoIndex = (context.currentStep - 1) % context.videoMedia.length;
+      const videoIndex = (context.mediaStartIndex + context.currentStep - 1) % context.videoMedia.length;
       const mediaItem = context.videoMedia[videoIndex];
       const video = createVideoElement(`/content/${mediaItem.path}`);
       context.videos.push(video);
@@ -272,6 +276,7 @@ export default function Paths3({ media }: { media: MediaItem[] }) {
       currentStep: 0,
       pathPoints,
       videoMedia,
+      mediaStartIndex: 0, // Start at beginning of media array
       lastStepTime: Date.now(),
       isAnimating: true,
       isPaused: false,
