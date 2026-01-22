@@ -4,7 +4,7 @@ import { MediaService } from '@/features/display/services/mediaService';
 export class ContentService {
   static async fetchProjects(): Promise<FileItem[]> {
     try {
-      const res = await fetch('/api/media?path=linked-content/projects');
+      const res = await fetch('/api/media?path=linked-content/projects&limit=5000');
       const data = await res.json();
       const folders = data.items?.filter((item: FileItem) => {
         return item.type === 'directory' &&
