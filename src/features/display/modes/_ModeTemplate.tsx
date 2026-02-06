@@ -17,6 +17,10 @@
  *      - variantSize: preferred image variant ('original' | 'sm' | 'md' | 'lg' | 'xl')
  *      - duration: time in ms before ModeManager rotates to the next mode
  *
+ *   IMPORTANT: Media items can be images OR videos (.mp4, .webm, .ogg).
+ *   Always check the file extension and render <video> or <img> accordingly.
+ *   See the helper function `isVideo()` in Pattern A below.
+ *
  *   That's it — no other files need editing.
  */
 
@@ -34,6 +38,11 @@ import styles from './modes.module.scss';
 type MyModeProps = {
   media: MediaItem[];
 };
+
+// Helper: check if a media item is a video
+function isVideo(name: string) {
+  return /\.(mp4|webm|ogg)$/i.test(name);
+}
 
 export default function MyMode({ media }: MyModeProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -53,16 +62,27 @@ export default function MyMode({ media }: MyModeProps) {
   }, [media.length]);
 
   const currentItem = media[currentIndex];
+  const fadeClass = `transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`;
 
   return (
     <BaseMode media={media} emptyMessage="No media for My Mode">
-      <div className={`transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <img
-          src={`/content/${currentItem?.path}`}
-          alt={currentItem?.name}
-          className="w-full h-full object-cover"
-        />
-      </div>
+      {currentItem && (
+        isVideo(currentItem.name) ? (
+          <video
+            key={currentItem.path}
+            src={`/content/${currentItem.path}`}
+            autoPlay muted loop playsInline
+            className={`w-full h-full object-cover ${fadeClass}`}
+          />
+        ) : (
+          <img
+            key={currentItem.path}
+            src={`/content/${currentItem.path}`}
+            alt={currentItem.name}
+            className={`w-full h-full object-cover ${fadeClass}`}
+          />
+        )
+      )}
     </BaseMode>
   );
 }

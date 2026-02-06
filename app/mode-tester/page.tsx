@@ -9,6 +9,7 @@ export default function ModeTester() {
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [showControls, setShowControls] = useState(false);
   const [isLaunched, setIsLaunched] = useState(false);
+  const [showNewModeInfo, setShowNewModeInfo] = useState(false);
 
   // Get default duration for selected mode
   const defaultDuration = DEFAULT_MODE_DURATIONS[selectedMode as keyof typeof DEFAULT_MODE_DURATIONS] || 30000;
@@ -148,6 +149,87 @@ export default function ModeTester() {
             <div><strong>Mode:</strong> {selectedMode}</div>
             <div><strong>Duration:</strong> {defaultDuration / 1000}s</div>
             <div><strong>Content:</strong> {selectedPath || 'None'}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Create New Mode Button */}
+      {!isLaunched && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40">
+          <button
+            onClick={() => setShowNewModeInfo(true)}
+            className="text-gray-500 hover:text-white text-sm underline underline-offset-4 transition-colors"
+          >
+            Want to create a new mode?
+          </button>
+        </div>
+      )}
+
+      {/* New Mode Info Modal */}
+      {showNewModeInfo && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Creating a New Mode</h2>
+                <button
+                  onClick={() => setShowNewModeInfo(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5 text-sm text-gray-700">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">1. Clone the repo</h3>
+                <code className="block bg-gray-100 rounded px-3 py-2 text-xs">
+                  git clone https://github.com/jonpackles/gretel-screens.git
+                </code>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">2. Create your component</h3>
+                <p>
+                  Add a new file in <code className="bg-gray-100 px-1 rounded">src/features/display/modes/</code>.
+                  See <code className="bg-gray-100 px-1 rounded">_ModeTemplate.tsx</code> in that folder for
+                  a ready-to-copy template with both media-driven and data-driven patterns.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">3. Register it</h3>
+                <p className="mb-2">
+                  Add one line to <code className="bg-gray-100 px-1 rounded">src/features/display/modes/registry.ts</code>:
+                </p>
+                <code className="block bg-gray-100 rounded px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">{`{ name: 'My Mode', component: MyMode, duration: 30000, mediaPath: 'linked-content/projects', variantSize: 'md' }`}</code>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">4. Test &amp; deploy</h3>
+                <p>
+                  Run <code className="bg-gray-100 px-1 rounded">npm run dev</code> locally,
+                  then use this Mode Tester page to preview your new mode.
+                  When ready, push to <code className="bg-gray-100 px-1 rounded">main</code> to deploy.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-800 text-xs">
+                <strong>Tip:</strong> Media items can be images or videos. Make sure your mode
+                renders <code>&lt;video&gt;</code> for .mp4/.webm files and <code>&lt;img&gt;</code> for
+                everything else. The template file has a helper for this.
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowNewModeInfo(false)}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Got it
+              </button>
+            </div>
           </div>
         </div>
       )}
