@@ -1,3 +1,5 @@
+import { VariantSize } from '@/shared/utils/variantUtils';
+
 // Display feature types
 export interface DisplayState {
   currentModeIndex: number;
@@ -26,12 +28,11 @@ export interface ModeMetrics {
   preloadSuccess: boolean;
 }
 
-// Re-export from services for convenience
-export type { ModeConfig } from '../services/sequenceService';
-export type { ModeComponent, ModeRegistryKey } from '../modes';
+// ModeComponent is exported from ../modes (re-exported via display/index.ts)
 
 export interface ModeSequenceItem {
   mode: string;
   duration?: number;
   mediaPath?: string;
-} 
+  variantSize?: VariantSize;
+}

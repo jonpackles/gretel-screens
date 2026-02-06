@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import path from 'path';
 import { MediaItem, MediaApiResponse, MediaQueryOptions } from '@/shared/types/media';
-import { 
-  extractMetadata, 
-  MetadataCache, 
-  isImage, 
-  isVideo, 
-  getMimeType 
+import {
+  extractMetadata,
+  MetadataCache,
+  isImage,
+  isVideo,
+  getMimeType
 } from '@/shared/utils/mediaMetadata';
-import { loadVisibilityDb } from '@/shared/utils/visibilityDb';
-import { filterVariantsForDashboard, isVariantFile } from '@/shared/utils/variantUtils';
+import { loadVisibilityDb, VisibilityRecord, getVariantSize as getVariantSizeFromVis } from '@/shared/utils/visibilityDb';
+import { filterVariantsForDashboard, isVariantFile, getBaseFileName } from '@/shared/utils/variantUtils';
 
 const BASE_PATH = path.join(process.cwd(), 'public/content');
-const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm', '.ogg'];
+const SUPPORTED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm', '.ogg']);
 
 // In-memory cache for directory listings
 const directoryCache = new Map<string, { items: MediaItem[]; timestamp: number; etag: string }>();
-const DIRECTORY_CACHE_TTL = 1000 * 60 * 1; // 5 minutes
+const DIRECTORY_CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
 // Track when visibility was last updated to force cache refresh
 let lastVisibilityUpdate = 0;
@@ -100,31 +101,37 @@ function sortItems(items: MediaItem[], sortBy: string = 'name', sortOrder: strin
 }
 
 /**
+ * Look up visibility for a path against a pre-loaded DB (with variant inheritance)
+ */
+function getVisibilityFromDb(normalizedPath: string, db: VisibilityRecord): 'visible' | 'hidden' {
+  if (normalizedPath in db) return db[normalizedPath];
+  if (isVariantFile(normalizedPath)) {
+    const base = getBaseFileName(normalizedPath);
+    if (base in db) return db[base];
+  }
+  return 'visible';
+}
+
+/**
  * Process a single file and return MediaItem with metadata
  */
-async function processFile(absolutePath: string, relativePath: string, stat: fs.Stats): Promise<MediaItem> {
+async function processFile(absolutePath: string, relativePath: string, stat: fs.Stats, visDb: VisibilityRecord): Promise<MediaItem> {
   const name = path.basename(absolutePath);
   const ext = path.extname(name).toLowerCase();
-  
+
   // Extract project from path
   const pathParts = relativePath.split('/');
   const projectIndex = pathParts.indexOf('projects');
-  const project = projectIndex !== -1 && projectIndex + 1 < pathParts.length 
-    ? pathParts[projectIndex + 1] 
+  const project = projectIndex !== -1 && projectIndex + 1 < pathParts.length
+    ? pathParts[projectIndex + 1]
     : undefined;
 
-  // Get visibility from database (with variant inheritance)
   const normalizedPath = relativePath.replace(/\\/g, '/');
-  const { getFileVisibility, getVariantSize } = await import('@/shared/utils/visibilityDb');
-  const { getBaseFileName, isVariantFile } = await import('@/shared/utils/variantUtils');
-  const visibility = getFileVisibility(normalizedPath);
-
-  // Extract variant information
-  const variantSize = getVariantSize(normalizedPath);
+  const visibility = getVisibilityFromDb(normalizedPath, visDb);
+  const variantSize = getVariantSizeFromVis(normalizedPath);
   const isVariant = isVariantFile(normalizedPath);
   const basePath = isVariant ? getBaseFileName(normalizedPath) : normalizedPath;
 
-  // Create base MediaItem with visibility and variant info
   const mediaItem: MediaItem = {
     name,
     type: 'file' as const,
@@ -139,9 +146,9 @@ async function processFile(absolutePath: string, relativePath: string, stat: fs.
     isVariant,
   };
 
-  // Extract additional metadata
+  // Extract additional metadata (pass stats to avoid re-stat)
   try {
-    const metadata = await extractMetadata(absolutePath);
+    const metadata = await extractMetadata(absolutePath, stat);
     Object.assign(mediaItem, metadata);
   } catch (error) {
     console.error(`Error extracting metadata for ${absolutePath}:`, error);
@@ -151,53 +158,43 @@ async function processFile(absolutePath: string, relativePath: string, stat: fs.
   return mediaItem;
 }
 
-/**
- * Merge visibility data with media items at response time
- */
-function mergeVisibilityData(items: MediaItem[]): MediaItem[] {
-  const visibilityDb = loadVisibilityDb();
-  
-  return items.map(item => {
-    // Normalize the path to use forward slashes
-    const normalizedPath = item.path.replace(/\\/g, '/');
-    return {
-      ...item,
-      visibility: visibilityDb[normalizedPath] || 'visible'
-    };
-  });
-}
 
 /**
  * Get directory contents with enhanced metadata
  */
 async function getEnhancedDirectoryContents(
-  dirPath: string, 
-  relativeBase = '', 
-  recursive = false
+  dirPath: string,
+  relativeBase = '',
+  recursive = false,
+  visDb: VisibilityRecord = {}
 ): Promise<MediaItem[]> {
-  if (!fs.existsSync(dirPath)) {
+  let entries: fs.Dirent[];
+  try {
+    entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
+  } catch {
     return [];
   }
 
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   const results: MediaItem[] = [];
+
+  // Collect files and subdirectories
+  const filePromises: Promise<MediaItem>[] = [];
+  const subdirPromises: Promise<MediaItem[]>[] = [];
 
   for (const entry of entries) {
     const absolutePath = path.join(dirPath, entry.name);
     const relativePath = path.join(relativeBase, entry.name);
-    const stat = fs.statSync(absolutePath);
 
     if (entry.isDirectory()) {
       if (recursive) {
-        // Recursively process subdirectories
-        const children = await getEnhancedDirectoryContents(absolutePath, relativePath, true);
-        results.push(...children);
+        subdirPromises.push(getEnhancedDirectoryContents(absolutePath, relativePath, true, visDb));
       } else {
-        // Add directory as an item (for project listing)
+        // Stat for directory listing (lightweight)
+        const stat = await fsPromises.stat(absolutePath);
         const name = path.basename(relativePath);
         const projectPathParts = relativePath.split('/');
         const project = projectPathParts.length >= 3 && projectPathParts[1] === 'projects' ? projectPathParts[2] : projectPathParts[0];
-        
+
         results.push({
           name,
           type: 'directory',
@@ -212,17 +209,30 @@ async function getEnhancedDirectoryContents(
         });
       }
     } else if (entry.isFile()) {
-      // Only process supported media files (now including previously hidden ones)
       const ext = path.extname(entry.name).toLowerCase();
-      if (SUPPORTED_EXTENSIONS.includes(ext)) {
-        try {
-          const mediaItem = await processFile(absolutePath, relativePath, stat);
-          results.push(mediaItem);
-        } catch (error) {
-          console.error(`Error processing file ${absolutePath}:`, error);
-        }
+      if (SUPPORTED_EXTENSIONS.has(ext)) {
+        // Kick off file processing in parallel
+        filePromises.push(
+          fsPromises.stat(absolutePath).then(stat =>
+            processFile(absolutePath, relativePath, stat, visDb)
+          ).catch(error => {
+            console.error(`Error processing file ${absolutePath}:`, error);
+            return null as any;
+          })
+        );
       }
     }
+  }
+
+  // Wait for all files and subdirectories in parallel
+  const [fileResults, subdirResults] = await Promise.all([
+    Promise.all(filePromises),
+    Promise.all(subdirPromises),
+  ]);
+
+  results.push(...fileResults.filter(Boolean));
+  for (const subdir of subdirResults) {
+    results.push(...subdir);
   }
 
   return results;
@@ -232,19 +242,11 @@ async function getEnhancedDirectoryContents(
  * Generate cache key for directory listing
  */
 function generateCacheKey(
-  options: MediaQueryOptions, 
-  includeHidden: boolean, 
-  isDashboard: boolean = false, 
+  options: MediaQueryOptions,
+  includeHidden: boolean,
+  isDashboard: boolean = false,
   showVariants: boolean = false
 ): string {
-  // Include visibility database hash in cache key
-  const visibilityDb = loadVisibilityDb();
-  const visibilityHash = require('crypto')
-    .createHash('md5')
-    .update(JSON.stringify(visibilityDb))
-    .digest('hex')
-    .substring(0, 8);
-    
   return JSON.stringify({
     path: options.path || '',
     recursive: options.recursive || false,
@@ -253,8 +255,7 @@ function generateCacheKey(
     includeHidden,
     isDashboard,
     showVariants,
-    visibilityHash,
-    lastVisibilityUpdate, // Include visibility update timestamp
+    lastVisibilityUpdate,
     sortBy: options.sortBy,
     sortOrder: options.sortOrder,
     search: options.search,
@@ -272,11 +273,7 @@ function checkClientCache(request: NextRequest, etag: string): boolean {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  
-  // Log cache statistics at start
-  const cacheStats = await MetadataCache.getStats();
-  console.log(`📊 Cache stats at start - Entries: ${cacheStats.size}, Memory: ${cacheStats.memoryUsage}, Disk: ${cacheStats.diskSize || 'N/A'}`);
-  
+
   // Parse query options
   const options: MediaQueryOptions = {
     path: searchParams.get('path') || '',
@@ -304,12 +301,13 @@ export async function GET(req: NextRequest) {
 
   try {
     // Validate path exists and is directory
-    if (!fs.existsSync(fullPath)) {
+    let dirStat: fs.Stats;
+    try {
+      dirStat = await fsPromises.stat(fullPath);
+    } catch {
       return NextResponse.json({ error: 'Directory not found' }, { status: 404 });
     }
-
-    const stat = fs.statSync(fullPath);
-    if (!stat.isDirectory()) {
+    if (!dirStat.isDirectory()) {
       return NextResponse.json({ error: 'Path is not a directory' }, { status: 400 });
     }
 
@@ -325,7 +323,6 @@ export async function GET(req: NextRequest) {
       // Use cached items
       items = cached.items;
       responseETag = cached.etag;
-      console.log(`📦 Using cached directory listing for: ${options.path}`);
       
       // Check if client has this cached version
       if (checkClientCache(req, responseETag)) {
@@ -338,20 +335,12 @@ export async function GET(req: NextRequest) {
         });
       }
     } else {
-      // Fetch fresh data
-      console.log(`🔄 Fetching fresh media data for: ${options.path}`);
-      items = await getEnhancedDirectoryContents(fullPath, options.path, options.recursive);
-      
-      // Merge visibility data before caching
-      items = mergeVisibilityData(items);
-      
-      // Generate ETag based on items and timestamp
-      const itemsHash = require('crypto')
-        .createHash('md5')
-        .update(JSON.stringify(items.map(i => ({ path: i.path, lastModified: i.lastModified, visibility: i.visibility }))))
-        .digest('hex');
-      responseETag = `"${itemsHash}-${now}"`;
-      
+      // Fetch fresh data — load visibility DB once for the entire request
+      const visDb = loadVisibilityDb();
+      items = await getEnhancedDirectoryContents(fullPath, options.path, options.recursive, visDb);
+
+      responseETag = `"${now}-${items.length}"`;
+
       // Cache the results
       directoryCache.set(cacheKey, {
         items,
@@ -376,16 +365,9 @@ export async function GET(req: NextRequest) {
     
     // Apply variant filtering for dashboard
     if (isDashboard && !showVariants) {
-      console.log(`📦 Dashboard mode: filtering variants from ${filteredItems.length} items`);
       const { displayItems } = filterVariantsForDashboard(filteredItems);
       filteredItems = displayItems;
-      console.log(`📦 Dashboard mode: ${filteredItems.length} primary files after variant filtering`);
     }
-    
-    // TODO: Potential optimization - cache variant grouping results
-    // Could cache the grouped variants separately to avoid re-grouping on each request
-    // Cache key: path + file modification times hash
-    // Would be beneficial for directories with many variants
     
     // Apply sorting
     const sortedItems = sortItems(filteredItems, options.sortBy, options.sortOrder);
@@ -404,10 +386,6 @@ export async function GET(req: NextRequest) {
       acc[type] = (acc[type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
-    // Log final cache statistics
-    const finalCacheStats = await MetadataCache.getStats();
-    console.log(`📊 Cache stats at end - Entries: ${finalCacheStats.size}, Memory: ${finalCacheStats.memoryUsage}, Disk: ${finalCacheStats.diskSize || 'N/A'}`);
     
     // Build response
     const response: MediaApiResponse = {

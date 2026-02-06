@@ -1,0 +1,84 @@
+{
+  "timestamp": "2026-02-06T18:52:47.928Z",
+  "results": [
+    {
+      "label": "Media API (projects, recursive)",
+      "ms": 119569,
+      "ok": true,
+      "snapshot": {
+        "itemCount": 6849,
+        "totalFiles": 6849
+      }
+    },
+    {
+      "label": "Media API (dashboard view)",
+      "ms": 18,
+      "ok": true,
+      "snapshot": {
+        "itemCount": 57
+      }
+    },
+    {
+      "label": "Sequences API (screen-a)",
+      "ms": 784,
+      "ok": true,
+      "snapshot": {
+        "modeCount": 4,
+        "modes": [
+          "Inform Calendar",
+          "Inform Projects",
+          "Pose House",
+          "Vertical Carousel"
+        ]
+      }
+    },
+    {
+      "label": "Sequences API (screen-b)",
+      "ms": 6,
+      "ok": true,
+      "snapshot": {
+        "modeCount": 4,
+        "modes": [
+          "Vertical Carousel",
+          "Paths",
+          "Slideshow",
+          "Grid"
+        ]
+      }
+    },
+    {
+      "label": "Settings API",
+      "ms": 7,
+      "ok": true,
+      "snapshot": {
+        "settingKeys": [
+          "hideOverlays",
+          "autoRotate",
+          "debugMode",
+          "highQuality",
+          "preloadNext"
+        ]
+      }
+    },
+    {
+      "label": "Inform API",
+      "ms": 1902,
+      "ok": true,
+      "snapshot": {
+        "blockCount": 34,
+        "types": [
+          "event",
+          "project"
+        ]
+      }
+    },
+    {
+      "label": "Media API (cold, no cache)",
+      "ms": 246,
+      "ok": true,
+      "snapshot": {
+        "itemCount": 6849
+      }
+    }
+  ]
+}
