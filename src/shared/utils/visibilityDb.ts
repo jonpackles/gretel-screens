@@ -7,6 +7,10 @@ export interface VisibilityRecord {
   [filePath: string]: 'visible' | 'hidden';
 }
 
+// In-memory cache: only re-read from disk when the file actually changes
+let cachedDb: VisibilityRecord | null = null;
+let cachedDbMtime: number = 0;
+
 /**
  * Extract base filename without variant suffix
  * e.g., "video-sm.mp4" -> "video.mp4", "image-md.jpg" -> "image.jpg"
@@ -55,16 +59,26 @@ function ensureDataDir() {
 }
 
 /**
- * Load visibility database from disk
+ * Load visibility database from disk (cached — only re-reads when file changes)
  */
 export function loadVisibilityDb(): VisibilityRecord {
   try {
     ensureDataDir();
-    if (fs.existsSync(VISIBILITY_DB_PATH)) {
-      const data = fs.readFileSync(VISIBILITY_DB_PATH, 'utf8');
-      return JSON.parse(data);
+    if (!fs.existsSync(VISIBILITY_DB_PATH)) {
+      cachedDb = {};
+      cachedDbMtime = 0;
+      return cachedDb;
     }
-    return {};
+
+    const mtime = fs.statSync(VISIBILITY_DB_PATH).mtime.getTime();
+    if (cachedDb && mtime === cachedDbMtime) {
+      return cachedDb;
+    }
+
+    const data = fs.readFileSync(VISIBILITY_DB_PATH, 'utf8');
+    cachedDb = JSON.parse(data);
+    cachedDbMtime = mtime;
+    return cachedDb!;
   } catch (error) {
     console.error('Error loading visibility database:', error);
     return {};
@@ -78,6 +92,9 @@ export function saveVisibilityDb(db: VisibilityRecord): void {
   try {
     ensureDataDir();
     fs.writeFileSync(VISIBILITY_DB_PATH, JSON.stringify(db, null, 2));
+    // Invalidate in-memory cache so next read picks up the change
+    cachedDb = db;
+    cachedDbMtime = fs.statSync(VISIBILITY_DB_PATH).mtime.getTime();
   } catch (error) {
     console.error('Error saving visibility database:', error);
   }

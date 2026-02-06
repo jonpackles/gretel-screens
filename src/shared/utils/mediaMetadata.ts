@@ -1,10 +1,36 @@
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 
 const execAsync = promisify(exec);
+
+// Simple semaphore to limit concurrent ffprobe processes
+class Semaphore {
+  private running = 0;
+  private queue: Array<() => void> = [];
+
+  constructor(private max: number) {}
+
+  async acquire(): Promise<void> {
+    if (this.running < this.max) {
+      this.running++;
+      return;
+    }
+    return new Promise<void>(resolve => this.queue.push(resolve));
+  }
+
+  release(): void {
+    this.running--;
+    const next = this.queue.shift();
+    if (next) {
+      this.running++;
+      next();
+    }
+  }
+}
+
+const ffprobeSemaphore = new Semaphore(5);
 
 export interface ExtractedMetadata {
   fileSize: number;
@@ -53,49 +79,45 @@ export function isVideo(filename: string): boolean {
 }
 
 /**
- * Generate content hash for caching
+ * Generate a fast content fingerprint from file stats (no file read needed)
  */
-export async function generateContentHash(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(filePath);
-    
-    stream.on('data', (data) => hash.update(data));
-    stream.on('end', () => resolve(hash.digest('hex')));
-    stream.on('error', reject);
-  });
+export function generateContentFingerprint(filePath: string, stats: fs.Stats): string {
+  return `${stats.size}-${stats.mtime.getTime()}`;
 }
 
 /**
- * Generate ETag from file stats and content hash
+ * Generate ETag from file stats
  */
-export function generateETag(filePath: string, contentHash?: string): string {
-  const stats = fs.statSync(filePath);
-  const base = `${stats.size}-${stats.mtime.getTime()}`;
-  return contentHash ? `"${base}-${contentHash.substring(0, 8)}"` : `"${base}"`;
+export function generateETag(filePath: string, stats?: fs.Stats): string {
+  if (!stats) stats = fs.statSync(filePath);
+  return `"${stats.size}-${stats.mtime.getTime()}"`;
 }
 
+// Cache the image-size import so we don't dynamic-import on every call
+let sizeOfFn: ((input: Buffer) => { width?: number; height?: number }) | null = null;
+
 /**
- * Get image dimensions using image-size library
+ * Get image dimensions by reading only the file header (first 64KB)
  */
 export async function getImageDimensions(filePath: string): Promise<{ width: number; height: number } | null> {
   try {
-    console.log(`Extracting dimensions for: ${filePath}`);
-    
-    // Read file into buffer for image-size
-    const imageBuffer = fs.readFileSync(filePath);
-    
-    // Dynamic import with proper destructuring
-    const { default: sizeOf } = await import('image-size');
-    const dimensions = sizeOf(imageBuffer);
-    
-    if (dimensions && dimensions.width && dimensions.height) {
-      console.log(`Dimensions: ${dimensions.width}x${dimensions.height}`);
-      return { width: dimensions.width, height: dimensions.height };
-    } else {
-      console.warn(`No dimensions found for: ${filePath}`);
-      return null;
+    if (!sizeOfFn) {
+      const { default: sizeOf } = await import('image-size');
+      sizeOfFn = sizeOf;
     }
+
+    // Only read the first 64KB — image-size only needs the header
+    const fd = fs.openSync(filePath, 'r');
+    const headerBuffer = Buffer.alloc(65536);
+    const bytesRead = fs.readSync(fd, headerBuffer, 0, 65536, 0);
+    fs.closeSync(fd);
+
+    const dimensions = sizeOfFn(headerBuffer.subarray(0, bytesRead));
+
+    if (dimensions && dimensions.width && dimensions.height) {
+      return { width: dimensions.width, height: dimensions.height };
+    }
+    return null;
   } catch (error) {
     console.warn(`Failed to get image dimensions for ${filePath}:`, error);
     return null;
@@ -109,89 +131,78 @@ export async function getVideoMetadata(filePath: string): Promise<{
   dimensions?: { width: number; height: number }; 
   duration?: number; 
 } | null> {
+  await ffprobeSemaphore.acquire();
   try {
-    console.log(`Extracting video metadata for: ${filePath}`);
-    
     // Escape file path for shell execution
     const escapedPath = filePath.replace(/'/g, "'\"'\"'");
-    
+
     // Use ffprobe to extract metadata
     const command = `ffprobe -v quiet -print_format json -show_format -show_streams '${escapedPath}'`;
-    
+
     const { stdout } = await execAsync(command, { timeout: 10000 }); // 10 second timeout
     const data = JSON.parse(stdout);
-    
+
     // Find the video stream
     const videoStream = data.streams?.find((stream: any) => stream.codec_type === 'video');
-    
+
     if (videoStream) {
       const dimensions = {
         width: parseInt(videoStream.width),
         height: parseInt(videoStream.height)
       };
-      
+
       const duration = data.format?.duration ? parseFloat(data.format.duration) : undefined;
-      
-      console.log(`Video metadata: ${dimensions.width}x${dimensions.height}, duration: ${duration ? `${duration.toFixed(1)}s` : 'unknown'}`);
-      
+
       return {
         dimensions: dimensions.width && dimensions.height ? dimensions : undefined,
         duration
       };
     } else {
-      console.warn(`No video stream found in: ${filePath}`);
       return null;
     }
   } catch (error) {
     console.warn(`Failed to extract video metadata for ${filePath}:`, error);
     return null;
+  } finally {
+    ffprobeSemaphore.release();
   }
 }
 
 /**
  * Extract comprehensive metadata from a media file
  */
-export async function extractMetadata(filePath: string): Promise<ExtractedMetadata> {
-  const stats = fs.statSync(filePath);
+export async function extractMetadata(filePath: string, stats?: fs.Stats): Promise<ExtractedMetadata> {
+  if (!stats) stats = fs.statSync(filePath);
   const filename = path.basename(filePath);
-  
-  // Check cache first with detailed logging
+
+  // Check cache first
   const fileModTime = stats.mtime.getTime();
   const cachedMetadata = await MetadataCache.get(filePath, fileModTime);
-  
+
   if (cachedMetadata) {
-    console.log(`✅ Using cached metadata for: ${filename}`);
     return cachedMetadata;
-  } else {
-    console.log(`🔄 Extracting fresh metadata for: ${filename} (cache miss or stale)`);
   }
-  
+
   // Basic file information
   const fileSize = stats.size;
   const mimeType = getMimeType(filename);
   const createdAt = stats.birthtime.toISOString();
-  
-  // Generate content hash (for caching)
-  const contentHash = await generateContentHash(filePath);
-  const etag = generateETag(filePath, contentHash);
-  
+
+  // Fast fingerprint from stats (no file read needed)
+  const contentHash = generateContentFingerprint(filePath, stats);
+  const etag = `"${contentHash}"`;
+
   // Extract dimensions based on file type
   let dimensions: { width: number; height: number } | undefined;
   let duration: number | undefined;
-  
+
   if (isImage(filename)) {
     const imageDims = await getImageDimensions(filePath);
     if (imageDims) {
       dimensions = imageDims;
     }
-  } else if (isVideo(filename)) {
-    const videoMeta = await getVideoMetadata(filePath);
-    if (videoMeta) {
-      dimensions = videoMeta.dimensions;
-      duration = videoMeta.duration;
-    }
   }
-  
+
   const metadata: ExtractedMetadata = {
     fileSize,
     mimeType,
@@ -201,18 +212,10 @@ export async function extractMetadata(filePath: string): Promise<ExtractedMetada
     etag,
     createdAt,
   };
-  
+
   // Cache the extracted metadata
   await MetadataCache.set(filePath, metadata);
-  
-  console.log(`✅ Metadata extraction complete for ${filename}:`, {
-    fileSize,
-    mimeType,
-    dimensions,
-    duration: duration ? `${duration.toFixed(1)}s` : 'N/A',
-    cached: false
-  });
-  
+
   return metadata;
 }
 

@@ -1,33 +1,15 @@
-import { lazy } from 'react';
 import { MediaItem } from '@/types';
+import { getModeEntry as _getModeEntry } from './registry';
 
-// Lazy load all modes for better performance
-export const Grid = lazy(() => import('./Grid'));
-export const Inform = lazy(() => import('./Inform'));
-export const Mosaic = lazy(() => import('./Mosaic'));
-export const Paths = lazy(() => import('./Paths'));
-export const PoseHouse = lazy(() => import('./PoseHouse'));
-export const Slideshow = lazy(() => import('./Slideshow'));
-export const VerticalCarousel = lazy(() => import('./VerticalCarousel'));
-
-// Import inform sub-modes
-export const InformCalendar = lazy(() => import('./inform/Calendar'));
-export const InformProjects = lazy(() => import('./inform/ProjectsMode'));
-
-// Mode registry for dynamic access
-export const MODE_REGISTRY = {
-  'Grid': Grid,
-  'Inform': Inform,
-  'Mosaic': Mosaic,
-  'Paths': Paths,
-  'Pose House': PoseHouse,
-  'Slideshow': Slideshow,
-  'Vertical Carousel': VerticalCarousel,
-  'Inform Calendar': InformCalendar,
-  'Inform Projects': InformProjects,
-} as const;
-
-export type ModeRegistryKey = keyof typeof MODE_REGISTRY;
+// Re-export everything from the registry (single source of truth)
+export {
+  MODE_REGISTRY,
+  AVAILABLE_MODES,
+  DEFAULT_MODE_DURATIONS,
+  MEDIA_PATHS,
+  getModeEntry,
+} from './registry';
+export type { ModeRegistryEntry } from './registry';
 
 // Type for mode components that support preloading
 export type ModeComponent = React.ComponentType<{ media: MediaItem[] }> & {
@@ -36,10 +18,6 @@ export type ModeComponent = React.ComponentType<{ media: MediaItem[] }> & {
 
 // Helper to get mode component by name
 export function getModeComponent(modeName: string): ModeComponent | null {
-  return MODE_REGISTRY[modeName as ModeRegistryKey] || null;
+  const entry = _getModeEntry(modeName);
+  return (entry?.component as ModeComponent) || null;
 }
-
-// Get all available mode names
-export function getAvailableModes(): string[] {
-  return Object.keys(MODE_REGISTRY);
-} 

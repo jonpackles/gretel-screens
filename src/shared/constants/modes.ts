@@ -1,34 +1,9 @@
-// Mode constants and configuration
-export const AVAILABLE_MODES = [
-  'Slideshow',
-  'Vertical Carousel',
-  'Mosaic',
-  'Pose House',
-  'Inform Calendar',
-  'Inform Projects',
-  'Grid',
-  'Paths',
-  'Inform',
-] as const;
+// Mode constants — re-exported from the single source of truth in registry.ts
+export { AVAILABLE_MODES, DEFAULT_MODE_DURATIONS, MEDIA_PATHS } from '@/features/display/modes/registry';
 
-export type ModeName = typeof AVAILABLE_MODES[number];
+export type ModeName = string;
 
-export const DEFAULT_MODE_DURATIONS = {
-  'Slideshow': 10000,
-  'Vertical Carousel': 5000,
-  'Mosaic': 40000,
-  'Pose House': 30000,
-  'Inform Calendar': 30000,
-  'Inform Projects': 30000,
-  'Grid': 30000,
-  'Paths': 30000,
-} as const;
-
-export const MEDIA_PATHS = [
-  'linked-content/projects',
-  'linked-content/posters',
-] as const;
-
+// Screen constants (not mode-specific, kept here)
 export const AVAILABLE_SCREENS = ['screen-a', 'screen-b'] as const;
 
-export type ScreenId = typeof AVAILABLE_SCREENS[number]; 
+export type ScreenId = typeof AVAILABLE_SCREENS[number];

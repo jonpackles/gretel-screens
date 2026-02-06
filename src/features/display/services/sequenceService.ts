@@ -1,13 +1,8 @@
 import { ScreenId } from '@/types';
 import { ModeSequenceItem } from '../types';
 
-export interface ModeConfig {
-  component: React.ComponentType<any>;
-  name: string;
-  duration: number;
-  mediaPath: string | undefined;
-  props?: any;
-}
+// ModeConfig is now defined in the registry
+export type { ModeRegistryEntry as ModeConfig } from '../modes/registry';
 
 export class SequenceService {
   /**
@@ -75,4 +70,4 @@ export class SequenceService {
 
     return { isValid: errors.length === 0, errors };
   }
-} 
+}

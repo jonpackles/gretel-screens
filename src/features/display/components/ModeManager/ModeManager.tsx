@@ -3,25 +3,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { MediaItem } from '@/shared/types/media';
 import { useKeyboard } from '@/shared/hooks/useKeyboard';
-import { 
-  groupFileVariants, 
-  selectOptimalVariant, 
+import {
+  groupFileVariants,
+  selectOptimalVariant,
   selectSpecificVariant,
-  DisplayContext 
+  DisplayContext
 } from '@/shared/utils/variantUtils';
-
-// Import all available modes from the new structure
-import Slideshow from '../../modes/Slideshow';
-import VerticalCarousel from '../../modes/VerticalCarousel';
-import PoseHouse from '../../modes/PoseHouse';
-import Inform from '../../modes/Inform';
-import Grid from '../../modes/Grid';
-import Paths3 from '../../modes/Paths-3';
-import Mosaic from '../../modes/Mosaic';
-
-// Import inform sub-modes
-import InformCalendar from '../../modes/inform/Calendar';
-import InformProjects from '../../modes/inform/ProjectsMode';
+import { MODE_REGISTRY, ModeRegistryEntry, getModeEntry } from '../../modes/registry';
 
 // Utility function for proper array shuffling (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -33,16 +21,6 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
-// Mode configuration
-interface ModeConfig {
-  component: React.ComponentType<any>;
-  name: string;
-  duration: number; // Duration in milliseconds
-  mediaPath: string | undefined; // Always present, can be undefined
-  variantSize?: 'original' | 'sm' | 'md' | 'lg' | 'xl' | 'small' | 'medium' | 'large' | 'thumb'; // Preferred variant size
-  props?: any; // Additional props for the mode
-}
-
 // Allows custom mode, duration, and mediaPath
 export type ModeSequenceItem = {
   mode: string;
@@ -51,70 +29,6 @@ export type ModeSequenceItem = {
   variantSize?: 'original' | 'sm' | 'md' | 'lg' | 'xl' | 'small' | 'medium' | 'large' | 'thumb';
 };
 
-const MODE_CONFIGS: ModeConfig[] = [
-  {
-    component: Slideshow,
-    name: 'Slideshow',
-    duration: 10000, 
-    mediaPath: 'linked-content/projects',
-    variantSize: 'original', // Full resolution for 4K TV display
-  },
-  {
-    component: VerticalCarousel,
-    name: 'Vertical Carousel',
-    duration: 5000,
-    mediaPath: 'linked-content/posters',
-    variantSize: 'md', // Medium for carousel items
-  },
-
-  {
-    component: PoseHouse,
-    name: 'Pose House',
-    duration: 30000, // 30 seconds
-    mediaPath: undefined, // PoseHouse uses camera, no media needed
-  },
-  {
-    component: Inform,
-    name: 'Inform',
-    duration: 30000, // 30 seconds
-    mediaPath: undefined, // Inform doesn't need media
-  },
-  {
-    component: Grid,
-    name: 'Grid',
-    duration: 30000, // 30 seconds
-    mediaPath: 'linked-content/projects',
-    variantSize: 'sm', // Small for performance with many grid items
-  },
-  {
-    component: Paths3,
-    name: 'Paths',
-    duration: 30000, // 30 seconds
-    mediaPath: 'linked-content/projects',
-    variantSize: 'md', // Medium for path animations
-  },
-  {
-    component: Mosaic,
-    name: 'Mosaic',
-    duration: 40000, // 40 seconds
-    mediaPath: 'linked-content/projects',
-    variantSize: 'md', // Medium for mosaic layout
-  },
-  // Add inform sub-modes
-  {
-    component: InformCalendar,
-    name: 'Inform Calendar',
-    duration: 30000, // 30 seconds
-    mediaPath: undefined, // Inform Calendar doesn't need media
-  },
-  {
-    component: InformProjects,
-    name: 'Inform Projects',
-    duration: 30000, // 30 seconds
-    mediaPath: undefined, // Inform Projects doesn't need media
-  },
-];
-
 export interface ModeManagerProps {
   autoRotate?: boolean;
   showControls?: boolean;
@@ -122,7 +36,7 @@ export interface ModeManagerProps {
 }
 
 // Helper to preload a mode if it has a preload method
-async function preloadMode(modeConfig: ModeConfig | null | undefined, media: MediaItem[] = []) {
+async function preloadMode(modeConfig: ModeRegistryEntry | null | undefined, media: MediaItem[] = []) {
   if (!modeConfig) return;
   if (typeof (modeConfig.component as any).preload === 'function') {
     try {
@@ -146,11 +60,11 @@ export default function ModeManager({
 
   // Compute active modes based on sequence prop
   const activeModes = useMemo(() => {
-    if (!sequence) return MODE_CONFIGS;
+    if (!sequence) return MODE_REGISTRY;
 
     return sequence
       .map((item) => {
-        const base = MODE_CONFIGS.find((m) => m.name === item.mode);
+        const base = getModeEntry(item.mode);
         if (!base) return null;
         return {
           ...base,
@@ -177,7 +91,7 @@ export default function ModeManager({
       console.log('ModeManager: Starting media fetch...');
       setLoading(true);
       const mediaCache: { [path: string]: MediaItem[] } = {};
-      
+
       // Get unique media paths from active modes only
       const mediaPaths = Array.from(new Set(
         activeModes
@@ -201,26 +115,26 @@ export default function ModeManager({
             // Fetch ALL files including variants for smart selection
             const res = await fetch(`/api/media?path=${path}&recursive=true&limit=10000&includeHidden=false`);
             const data = await res.json();
-            
+
             const allFiles = (data.items?.filter((item: MediaItem) =>
-              item.type === 'file' && 
+              item.type === 'file' &&
               /\.(jpg|jpeg|png|gif|webp|mp4)$/i.test(item.name)
             ) || []);
 
             console.log(`ModeManager: Found ${allFiles.length} total files in ${path}`);
-            
+
             // Group files by variants and select mode-specific versions
             const variantGroups = groupFileVariants(allFiles);
             console.log(`ModeManager: Grouped into ${variantGroups.length} variant groups`);
-            
+
             // Find the mode that uses this media path to get its variant preference
             const modeForPath = activeModes.find(mode => mode.mediaPath === path);
             const preferredSize = modeForPath?.variantSize;
-            
+
             // Select variants based on mode preference
             const optimizedFiles = variantGroups.map(group => {
               let selectedVariant;
-              
+
                              if (preferredSize) {
                  // Use mode-specific variant size
                  selectedVariant = selectSpecificVariant(group, preferredSize);
@@ -234,7 +148,7 @@ export default function ModeManager({
                  selectedVariant = selectOptimalVariant(group, displayContext);
                  console.log(`ModeManager: Selected ${selectedVariant.size} variant (auto) for ${group.baseName}`);
                }
-              
+
               return selectedVariant.mediaItem;
             });
 
@@ -270,7 +184,7 @@ export default function ModeManager({
       setIsFading(true);
 
       fadeTimeoutRef.current = setTimeout(() => {
-        setCurrentModeIndex((prevIndex) => 
+        setCurrentModeIndex((prevIndex) =>
           (prevIndex + 1) % activeModes.length
         );
         setIsFading(false);
@@ -289,7 +203,7 @@ export default function ModeManager({
     const nextIndex = (currentModeIndex + 1) % activeModes.length;
     const nextMode = activeModes[nextIndex] ?? null;
     const nextMediaPath = nextMode?.mediaPath;
-    
+
     // Use freshly shuffled media for preloading too
     const nextMedia = nextMediaPath ? shuffleArray(media[nextMediaPath] || []) : [];
     preloadMode(nextMode, nextMedia);
@@ -320,9 +234,9 @@ export default function ModeManager({
   useEffect(() => {
     if (currentMode && window.parent !== window) {
       // Get screen identifier from URL
-      const screenId = window.location.pathname.includes('screen-a') ? 'screen-a' : 
+      const screenId = window.location.pathname.includes('screen-a') ? 'screen-a' :
                       window.location.pathname.includes('screen-b') ? 'screen-b' : null;
-      
+
       if (screenId) {
         window.parent.postMessage({
           type: 'MODE_CHANGED',
@@ -340,7 +254,7 @@ export default function ModeManager({
       <div className="flex items-center justify-center w-full h-screen bg-black">
         <div className="text-white text-center">
           <div className="text-2xl mb-4">No modes selected</div>
-          <div className="text-sm">Available modes: {MODE_CONFIGS.map(m => m.name).join(', ')}</div>
+          <div className="text-sm">Available modes: {MODE_REGISTRY.map(m => m.name).join(', ')}</div>
         </div>
       </div>
     );
@@ -361,7 +275,7 @@ export default function ModeManager({
   }
 
   // Get media for current mode - shuffle fresh each time for variety
-  const currentMedia = currentMode?.mediaPath 
+  const currentMedia = currentMode?.mediaPath
     ? (() => {
         const shuffled = shuffleArray(media[currentMode.mediaPath] || []);
         console.log(`ModeManager: Freshly shuffled ${shuffled.length} items for ${currentMode.name}`);
@@ -382,7 +296,6 @@ export default function ModeManager({
   const CurrentModeComponent = currentMode.component;
   const modeProps = {
     media: currentMedia,
-    ...currentMode.props,
   };
 
   return (
