@@ -45,3 +45,5 @@ ecosystem.config.js
 
 # Sentry Config File
 .env.sentry-build-plugin
+lib/credentials/service-account.json
+.data/inform-content.json
