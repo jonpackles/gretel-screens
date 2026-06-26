@@ -8,15 +8,17 @@ const GRID_ROWS = 14; // 7 x 14 = 98
 const GRID_SIZE = GRID_COLS * GRID_ROWS;
 const SCROLL_SPEED = 0.03; // px per ms
 
-// Initial visible rows
+// Fixed window size — never grows beyond this
 const INITIAL_VISIBLE_ROWS = GRID_ROWS * 2;
 const INITIAL_VISIBLE_SIZE = GRID_COLS * INITIAL_VISIBLE_ROWS;
+const MAX_ROWS = INITIAL_VISIBLE_ROWS;
+const MAX_ITEMS = INITIAL_VISIBLE_SIZE;
 
 // Animation constants
 const FADE_IN_DELAY = 50; // ms between each item animation
 const FADE_IN_DURATION = 800; // ms for each item to fade in
 
-// Scroll threshold for adding new rows (percentage of total height)
+// Scroll threshold for recycling rows (percentage of total height)
 const SCROLL_THRESHOLD = 0.7;
 
 type GridProps = {
@@ -26,32 +28,44 @@ type GridProps = {
 export default function Grid({ media }: GridProps) {
   const [gridItems, setGridItems] = useState<MediaItem[]>([]);
   const [visibleItems, setVisibleItems] = useState<Set<number>>(new Set());
-  const [totalRows, setTotalRows] = useState(INITIAL_VISIBLE_ROWS);
   const containerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollY = useRef(0);
   const animationTimeouts = useRef<NodeJS.Timeout[]>([]);
   const isAddingRows = useRef(false);
+  const isFirstLoad = useRef(true);
 
-  // Function to generate more grid items
+  // Sliding window: drop first GRID_SIZE items, append new ones, adjust scroll back
   const generateMoreItems = () => {
     if (!media?.length || isAddingRows.current) return;
-    
+
     isAddingRows.current = true;
     const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, GRID_SIZE);
-    setGridItems(prev => [...prev, ...shuffled]);
-    setTotalRows(prev => prev + GRID_ROWS);
+
+    setGridItems(prev => {
+      const trimmed = prev.length >= MAX_ITEMS ? prev.slice(GRID_SIZE) : prev;
+      return [...trimmed, ...shuffled];
+    });
+
+    // Pull scroll position back by the height of the removed rows so the view doesn't jump
+    const container = containerRef.current;
+    if (container) {
+      const rowHeight = container.scrollHeight / MAX_ROWS;
+      scrollY.current = Math.max(0, scrollY.current - rowHeight * GRID_ROWS);
+    }
+
     isAddingRows.current = false;
   };
 
   // Initial grid setup
   useEffect(() => {
     if (!media?.length) return;
+    isFirstLoad.current = true;
     const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, GRID_SIZE);
     setGridItems([...shuffled, ...shuffled]);
   }, [media]);
 
-  // Scroll detection for adding more rows
+  // Scroll detection for recycling rows
   useEffect(() => {
     if (gridItems.length === 0) return;
 
@@ -60,7 +74,6 @@ export default function Grid({ media }: GridProps) {
       if (!container) return;
 
       const scrollPercentage = container.scrollTop / (container.scrollHeight - container.clientHeight);
-      
       if (scrollPercentage > SCROLL_THRESHOLD) {
         generateMoreItems();
       }
@@ -76,70 +89,63 @@ export default function Grid({ media }: GridProps) {
         container.removeEventListener('scroll', checkScroll);
       }
     };
-  }, [gridItems]);
+  }, [gridItems, media]);
 
-  // Fade-in animation effect
+  // Fade-in animation effect — only animates on first load; recycles show items immediately
   useEffect(() => {
     if (gridItems.length === 0) return;
 
-    // Clear any existing timeouts
     animationTimeouts.current.forEach(timeout => clearTimeout(timeout));
     animationTimeouts.current = [];
-    
-    // Reset visible items
+
+    if (!isFirstLoad.current) {
+      // Recycled content: show all immediately without re-animating
+      setVisibleItems(new Set(Array.from({ length: gridItems.length }, (_, i) => i)));
+      return;
+    }
+    isFirstLoad.current = false;
+
     setVisibleItems(new Set());
 
-    // Dynamic configuration
     const SAFETY_BUFFER = 3;
     const START_ROW = Math.max(0, GRID_ROWS - SAFETY_BUFFER);
-    
-    // Calculate animation order (from START_ROW going upward)
+
     const animationOrder: number[] = [];
-    
-    // Create bottom-to-top order starting from START_ROW
     for (let row = START_ROW; row >= 0; row--) {
       for (let col = 0; col < GRID_COLS; col++) {
-        const index = row * GRID_COLS + col;
-        animationOrder.push(index);
+        animationOrder.push(row * GRID_COLS + col);
       }
     }
 
-    // Trigger animations with staggered delays
     animationOrder.forEach((itemIndex, orderIndex) => {
       const timeout = setTimeout(() => {
         setVisibleItems(prev => new Set([...prev, itemIndex]));
       }, orderIndex * FADE_IN_DELAY);
-      
       animationTimeouts.current.push(timeout);
     });
 
-    // Show all remaining items immediately (below START_ROW)
     const remainingItems: number[] = [];
-    for (let row = START_ROW + 1; row < totalRows; row++) {
+    for (let row = START_ROW + 1; row < MAX_ROWS; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
         const index = row * GRID_COLS + col;
-        if (index < gridItems.length) {
-          remainingItems.push(index);
-        }
+        if (index < gridItems.length) remainingItems.push(index);
       }
     }
-    
-    // Show remaining items immediately
     setVisibleItems(prev => {
       const newSet = new Set(prev);
       remainingItems.forEach(item => newSet.add(item));
       return newSet;
     });
 
-    // Cleanup timeouts on unmount
     return () => {
       animationTimeouts.current.forEach(timeout => clearTimeout(timeout));
     };
-  }, [gridItems, totalRows]);
+  }, [gridItems]);
 
-  // Animation loop for seamless upward scrolling
+  // Animation loop — starts once when items load, never restarts
+  const hasItems = gridItems.length > 0;
   useEffect(() => {
-    if (gridItems.length === 0) return;
+    if (!hasItems) return;
     let animationFrame: number;
     let lastTimestamp = performance.now();
 
@@ -156,11 +162,11 @@ export default function Grid({ media }: GridProps) {
     }
     animationFrame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrame);
-  }, [gridItems]);
+  }, [hasItems]);
 
-  // Build grid rows
+  // Build grid rows (fixed at MAX_ROWS)
   const rows = [];
-  for (let r = 0; r < totalRows; r++) {
+  for (let r = 0; r < MAX_ROWS; r++) {
     const row = gridItems.slice(r * GRID_COLS, (r + 1) * GRID_COLS);
     rows.push(row);
   }
@@ -201,7 +207,7 @@ export default function Grid({ media }: GridProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateRows: `repeat(${totalRows}, 1fr)`,
+          gridTemplateRows: `repeat(${MAX_ROWS}, 1fr)`,
           gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
           width: '110vw',
           marginLeft: '-5vw',
@@ -230,7 +236,7 @@ export default function Grid({ media }: GridProps) {
                     width: '100%',
                     height: '100%',
                     aspectRatio: '1 / 1',
-                    overflow: (cIdx === 0 || cIdx === GRID_COLS - 1 || rIdx === 0 || rIdx === totalRows - 1) ? 'visible' : 'hidden',
+                    overflow: (cIdx === 0 || cIdx === GRID_COLS - 1 || rIdx === 0 || rIdx === MAX_ROWS - 1) ? 'visible' : 'hidden',
                   }}
                 >
                   {isVideo ? (
