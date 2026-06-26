@@ -1,110 +1,96 @@
-import { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { MediaItem } from '@/shared/types/media';
 import styles from './modes.module.scss';
-import { basel, quadrant, droulers } from '@/styles/fonts';
+import { basel } from '@/styles/fonts';
 
-const GRID_COLS = 7;
-const GRID_ROWS = 14; // 7 x 14 = 98
+const GRID_COLS = 5;
+const GRID_ROWS = 14; // 5 x 14 = 70
 const GRID_SIZE = GRID_COLS * GRID_ROWS;
+const MAX_ROWS = GRID_ROWS * 2; // fixed 28 rows, 140 cells
 const SCROLL_SPEED = 0.03; // px per ms
-
-// Fixed window size — never grows beyond this
-const INITIAL_VISIBLE_ROWS = GRID_ROWS * 2;
-const INITIAL_VISIBLE_SIZE = GRID_COLS * INITIAL_VISIBLE_ROWS;
-const MAX_ROWS = INITIAL_VISIBLE_ROWS;
-const MAX_ITEMS = INITIAL_VISIBLE_SIZE;
 
 // Animation constants
 const FADE_IN_DELAY = 50; // ms between each item animation
 const FADE_IN_DURATION = 800; // ms for each item to fade in
 
-// Scroll threshold for recycling rows (percentage of total height)
-const SCROLL_THRESHOLD = 0.7;
-
 type GridProps = {
   media: MediaItem[];
 };
+
+type GridVideoProps = {
+  src: string;
+  scrollRoot: RefObject<HTMLDivElement | null>;
+};
+
+function GridVideo({ src, scrollRoot }: GridVideoProps) {
+  const cellRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const cell = cellRef.current;
+    const video = videoRef.current;
+    if (!cell || !video) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          void video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      },
+      { root: scrollRoot.current, threshold: 0.15 }
+    );
+
+    observer.observe(cell);
+    return () => observer.disconnect();
+  }, [src, scrollRoot]);
+
+  return (
+    <div
+      ref={cellRef}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        maxWidth: '70%',
+        maxHeight: '70%',
+      }}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        className="max-w-full max-h-full object-contain"
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        style={{ maxWidth: '100%', maxHeight: '100%' }}
+      />
+    </div>
+  );
+}
 
 export default function Grid({ media }: GridProps) {
   const [gridItems, setGridItems] = useState<MediaItem[]>([]);
   const [visibleItems, setVisibleItems] = useState<Set<number>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollY = useRef(0);
   const animationTimeouts = useRef<NodeJS.Timeout[]>([]);
-  const isAddingRows = useRef(false);
-  const isFirstLoad = useRef(true);
 
-  // Sliding window: drop first GRID_SIZE items, append new ones, adjust scroll back
-  const generateMoreItems = () => {
-    if (!media?.length || isAddingRows.current) return;
-
-    isAddingRows.current = true;
-    const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, GRID_SIZE);
-
-    setGridItems(prev => {
-      const trimmed = prev.length >= MAX_ITEMS ? prev.slice(GRID_SIZE) : prev;
-      return [...trimmed, ...shuffled];
-    });
-
-    // Pull scroll position back by the height of the removed rows so the view doesn't jump
-    const container = containerRef.current;
-    if (container) {
-      const rowHeight = container.scrollHeight / MAX_ROWS;
-      scrollY.current = Math.max(0, scrollY.current - rowHeight * GRID_ROWS);
-    }
-
-    isAddingRows.current = false;
-  };
-
-  // Initial grid setup
+  // Initial grid setup — fixed size, duplicated shuffle for seamless scroll loop
   useEffect(() => {
     if (!media?.length) return;
-    isFirstLoad.current = true;
     const shuffled = [...media].sort(() => Math.random() - 0.5).slice(0, GRID_SIZE);
     setGridItems([...shuffled, ...shuffled]);
   }, [media]);
 
-  // Scroll detection for recycling rows
-  useEffect(() => {
-    if (gridItems.length === 0) return;
-
-    const checkScroll = () => {
-      const container = containerRef.current;
-      if (!container) return;
-
-      const scrollPercentage = container.scrollTop / (container.scrollHeight - container.clientHeight);
-      if (scrollPercentage > SCROLL_THRESHOLD) {
-        generateMoreItems();
-      }
-    };
-
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('scroll', checkScroll);
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener('scroll', checkScroll);
-      }
-    };
-  }, [gridItems, media]);
-
-  // Fade-in animation effect — only animates on first load; recycles show items immediately
+  // Fade-in animation effect (runs once on load)
   useEffect(() => {
     if (gridItems.length === 0) return;
 
     animationTimeouts.current.forEach(timeout => clearTimeout(timeout));
     animationTimeouts.current = [];
-
-    if (!isFirstLoad.current) {
-      // Recycled content: show all immediately without re-animating
-      setVisibleItems(new Set(Array.from({ length: gridItems.length }, (_, i) => i)));
-      return;
-    }
-    isFirstLoad.current = false;
-
     setVisibleItems(new Set());
 
     const SAFETY_BUFFER = 3;
@@ -131,6 +117,7 @@ export default function Grid({ media }: GridProps) {
         if (index < gridItems.length) remainingItems.push(index);
       }
     }
+
     setVisibleItems(prev => {
       const newSet = new Set(prev);
       remainingItems.forEach(item => newSet.add(item));
@@ -142,7 +129,7 @@ export default function Grid({ media }: GridProps) {
     };
   }, [gridItems]);
 
-  // Animation loop — starts once when items load, never restarts
+  // Continuous scroll within fixed grid; loop at midpoint (duplicate content)
   const hasItems = gridItems.length > 0;
   useEffect(() => {
     if (!hasItems) return;
@@ -156,6 +143,11 @@ export default function Grid({ media }: GridProps) {
 
       const container = containerRef.current;
       if (container) {
+        const maxScroll = container.scrollHeight - container.clientHeight;
+        const loopPoint = maxScroll / 2;
+        if (loopPoint > 0 && scrollY.current >= loopPoint) {
+          scrollY.current -= loopPoint;
+        }
         container.scrollTop = scrollY.current;
       }
       animationFrame = requestAnimationFrame(animate);
@@ -164,7 +156,6 @@ export default function Grid({ media }: GridProps) {
     return () => cancelAnimationFrame(animationFrame);
   }, [hasItems]);
 
-  // Build grid rows (fixed at MAX_ROWS)
   const rows = [];
   for (let r = 0; r < MAX_ROWS; r++) {
     const row = gridItems.slice(r * GRID_COLS, (r + 1) * GRID_COLS);
@@ -197,13 +188,13 @@ export default function Grid({ media }: GridProps) {
           transform: translateY(30px);
           transition: opacity ${FADE_IN_DURATION}ms ease-out, transform ${FADE_IN_DURATION}ms ease-out;
         }
-        
+
         .grid-item.visible {
           opacity: 1;
           transform: translateY(0);
         }
       `}</style>
-      
+
       <div
         style={{
           display: 'grid',
@@ -222,11 +213,10 @@ export default function Grid({ media }: GridProps) {
               const isVisible = visibleItems.has(itemIndex);
               const isVideo = /\.(mp4|webm|ogg)$/i.test(item.name);
               const src = `/content/${item.path}`;
-              
+
               return (
                 <div
                   key={item.path || item.name || `${rIdx}-${cIdx}`}
-                  ref={cIdx === 0 ? el => { rowRefs.current[rIdx] = el; } : undefined}
                   className={`grid-item ${isVisible ? 'visible' : ''}`}
                   style={{
                     display: 'flex',
@@ -240,15 +230,7 @@ export default function Grid({ media }: GridProps) {
                   }}
                 >
                   {isVideo ? (
-                    <video
-                      src={src}
-                      className="max-w-full max-h-full object-contain"
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                      style={{ maxWidth: '70%', maxHeight: '70%' }}
-                    />
+                    <GridVideo src={src} scrollRoot={containerRef} />
                   ) : (
                     <img
                       src={src}
@@ -271,7 +253,7 @@ export default function Grid({ media }: GridProps) {
                       textAlign: 'center',
                     }}
                   >
-                    {item.name.length > 35 
+                    {item.name.length > 35
                       ? `${item.name.substring(0, 20)}${item.name.substring(item.name.lastIndexOf('.'))}`
                       : item.name
                     }
@@ -295,17 +277,15 @@ Grid.preload = async function(media: MediaItem[] = []) {
   const preloaders = shuffled.map(item => {
     const src = `/content/${item.path}`;
     if (/\.(mp4|webm|ogg)$/i.test(item.name)) {
-      // Preload video
       return new Promise(resolve => {
         const video = document.createElement('video');
         video.src = src;
-        video.preload = 'auto';
+        video.preload = 'metadata';
         video.muted = true;
-        video.oncanplaythrough = () => resolve(true);
+        video.onloadeddata = () => resolve(true);
         video.onerror = () => resolve(false);
       });
     } else {
-      // Preload image
       return new Promise(resolve => {
         const img = new window.Image();
         img.src = src;

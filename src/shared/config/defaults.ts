@@ -14,7 +14,7 @@ export const APP_DEFAULTS = {
   VIDEO_SPACING: 80, // px
   
   // Grid settings
-  GRID_COLS: 7,
+  GRID_COLS: 5,
   GRID_ROWS: 14,
   
   // Path animation settings
