@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# AppleScript / LaunchAgents use a minimal PATH — include Homebrew
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
 APP_DIR="/Users/gretel/Desktop/gretel-screens"
 cd "$APP_DIR"
 
