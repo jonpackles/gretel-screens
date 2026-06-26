@@ -19,7 +19,7 @@ handler.on('push', event => {
   if (branch === 'refs/heads/main') {
     console.log('🚀 Push to main detected. Pulling changes...');
     exec(
-      'cd /Users/gretel/Desktop/gretel-screens && git fetch origin && git reset --hard origin/main && pm2 restart gretel-screens',
+      'cd /Users/gretel/Desktop/gretel-screens && git fetch origin && git reset --hard origin/main && npm run build && pm2 restart gretel-screens',
       (err, stdout, stderr) => {
         if (err) {
           console.error('Error running deploy script:', stderr);
